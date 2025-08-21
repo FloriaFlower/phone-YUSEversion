@@ -1,0 +1,99 @@
+# 手机模拟器 - 全功能综合测试脚本
+
+<WorldState>
+时间: 2025年10月26日，星期日 10:00
+</WorldState>
+
+(故事开始... 你拿起手机，看到屏幕上有一系列新的通知。)
+
+---
+## 第一部分: 微信、社交及应用功能测试
+---
+
+### 1.1 - 私聊与富文本
+
+(你点开微信，首先看到的是来自“夏诗”的消息。)
+[app:微信, type:私聊, id:13910284576, name:夏诗, time:10:01, content:早上好呀！我昨天整理了一些笔记，发给你看看。]
+[app:微信, type:私聊, id:13910284576, name:夏诗, time:10:02, content:这是第一页的重点：\n1. 关键概念\n2. 核心公式\n记得看哦！]
+
+(你回复了她。)
+[app:微信, type:私聊, from_id:PLAYER_USER, from_name:{{user}}, to_id:13910284576, time:10:03, content:收到了，多谢！]
+
+(夏诗很快又发来了几条消息，内容丰富多彩。)
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:05, content:[图片:cat_photo.jpeg]]
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:06, content:[图片:一张阳光下打盹的懒猫的照片，看起来特别惬意。]]
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:07, content:[语音:8"|对了，上次你借我的书，我已经看完了，什么时候还给你方便呀？]]
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:08, content:[转账:25.00|上次的奶茶钱~]]
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:09, content:[红包:8.88|周末愉快！]]
+[app:微信, type:私聊, from_id:13910284576, from_name:夏诗, to_id:PLAYER_USER, time:10:10, content:[定位:市中心图书馆]]
+
+---
+### 1.2 - 群聊与系统消息
+
+(这时，家庭群里也有了新消息。)
+[app:微信, type:群聊, group_id:10086, group_name:相亲相爱一家人, sender_id:13812345678, sender_name:林阿姨, time:10:15, content:大家周末有什么安排呀？]
+
+(你看到林阿姨的消息，才想起来刚刚通过了她的好友请求。)
+[app:微信, type:系统提示, contact_id:13812345678, time:10:14, content:你通过了对方的好友请求，现在可以开始聊天了。]
+
+---
+### 1.3 - 朋友圈与个人资料更新
+
+(你点开朋友圈，发现夏诗更新了动态和个人资料。)
+[app:微信, type:更新资料, data:{"profile_id":"13910284576", "bio":"天气真好，心情也跟着放晴了！☀️", "cover_image":"sunflower_field.jpg"}]
+[app:微信, type:新动态, data:{"动态id":"moment_x_001","发布者id":"13910284576","发布者昵称":"夏诗","time":"10:20","内容":"周末的图书馆，是知识和阳光的味道。 #学习打卡","图片":["library_window.jpg"],"地点":"市中心图书馆","点赞":["13812345678"],"评论":[{"commenterId":"13812345678","text":"小夏真用功！"}]}]
+
+---
+### 1.4 - 邮箱功能
+
+(退出微信，你习惯性地点开了邮箱，发现一封新邮件。)
+[app:Email, type:New, from_id:hr@starlight.com, from_name:Starlight HR, subject:关于Starlight学院的入学邀请, time:10:25, content:尊敬的{{user}}，\n恭喜您已被我院录取！详情请见附件。\n祝好，\nStarlight学院招生办, attachment_name:入学须知.pdf, attachment_desc:1.2MB]
+
+
+---
+## 第二部分: 通话功能测试
+---
+
+### 2.1 - 微信语音通话
+
+(就在你阅读邮件时，一个微信语音通话请求突然弹了出来。)
+[app:Phone, type:IncomingCall, from_id:13910284576, from_name:夏诗]
+
+(你划动接听...)
+[app:微信, type:语音, id:13910284576, name:夏诗, time:10:30, content:喂？你接到啦？太好了！]
+[app:微信, type:语音, id:13910284576, name:夏诗, time:10:31, content:我就是想问问你看到我发的红包和转账了没，别忘了领呀。]
+
+---
+### 2.2 - 手机原生电话
+
+(挂断了夏诗的电话没多久，一个陌生号码又打了进来。)
+[app:Phone, type:IncomingCall, from_id:13888888888, from_name:快递小哥]
+
+(你接通了电话。)
+[app:电话, type:电话, id:13888888888, name:快递小哥, time:10:35, content:你好，是{{user}}吗？有个快递到了，麻烦到小区门口取一下。]
+[app:电话, type:电话, id:13888888888, name:快递小哥, time:10:36, content:好的，我就在门口超市旁边等你。]
+
+---
+## 第三部分: 浏览器全链路测试
+---
+
+### 3.1 - 首次搜索 (填充网站目录)
+(你打开浏览器，想查一下Starlight学院的背景资料，于是在搜索框输入了“Starlight学院 历史”。)
+
+(系统提示：{{user}}在浏览器中搜索：“Starlight学院 历史”)
+(AI应为每个搜索结果输出独立的 `[app:浏览器, type:搜索目录, ...]` 指令)
+[app:浏览器, type:搜索目录, title:学院编年史 - Starlight综合学院官网, url:starlight.edu/history/chronicles, snippet:Starlight学院的官方历史记录，从创立之初到如今的辉煌，记录了每一个重要的里程碑事件。]
+[app:浏览器, type:搜索目录, title:学生论坛：关于Starlight历史的讨论, url:starlight-fans.com/forum/thread/2048, snippet:老校友们，还记得我们当年经历过的“大停电”事件吗？一起来聊聊学院的趣闻轶事。]
+
+### 3.2 - 验证网站目录和历史记录
+(搜索结果显示后，你先不急着点击，而是点击了浏览器菜单中的“资料库”按钮。在资料库中，你切换到“网站目录”标签页，应该能看到刚才搜索出的所有网站条目。然后你切换到“历史记录”标签页，此时应该**为空**，因为搜索本身不计入历史。)
+
+### 3.3 - 浏览网页 (生成页面内容)
+(你回到搜索结果页，点击了标题为“学院编年史 - Starlight综合学院官网”的链接。)
+
+(系统提示：{{user}}点击了标题为“学院编年史 - Starlight综合学院官网”的链接)
+(AI应输出单条 `[app:浏览器, type:网页, ...]` 指令, content字段为一个JSON字符串)
+[app:浏览器, type:网页, url:starlight.edu/history/chronicles, title:学院编年史 - Starlight综合学院官网, content:[{"type":"h1","text":"Starlight学院编年史"},{"type":"p","text":"从创立之初到如今的辉煌，Starlight学院的历史是一部充满了梦想、挑战与创新的史诗。"},{"type":"p","text":"您可以下载我们的[完整历史文档](Starlight_完整历史.pdf|PDF, 12.5MB)以了解更多详情。"}]]
+
+### 3.4 - 验证书签和最终历史记录
+(看完网页后，你觉得这个官方历史很有用，于是点击了地址栏旁边的星形书签按钮，将其收藏。然后你再次进入“资料库”，检查“书签”标签页，确认该网页已被收藏。同时，检查“历史记录”，现在应该只有一条记录：就是刚才浏览的“学院编年史”页面。)
