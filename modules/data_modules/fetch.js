@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -8,6 +9,28 @@ export function init(deps, uiHandler) {
     parentWin = deps.win;
     UI = uiHandler;
 }
+
+async function fetchAllDirectoryAndRequests() {
+    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.pendingFriendRequests = [];
+        return;
+    }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const dirEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_DIR_NAME);
+        if (dirEntry) {
+            const dirData = JSON.parse(dirEntry.content || '{}');
+            PhoneSim_State.pendingFriendRequests = dirData.friend_requests || [];
+        } else {
+            PhoneSim_State.pendingFriendRequests = [];
+        }
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch directory and friend requests:', er);
+        PhoneSim_State.pendingFriendRequests = [];
+    }
+}
+
 
 export async function fetchAllBrowserData() {
     const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
@@ -62,6 +85,7 @@ export async function fetchAllData() {
     await fetchAllCallLogs();
     await fetchAllBrowserData();
     await fetchAllForumData();
+    await fetchAllDirectoryAndRequests();
     UI.updateGlobalUnreadCounts();
 }
 
@@ -108,7 +132,7 @@ export async function fetchAllContacts() {
     const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
     if (!lorebookName) {
         PhoneSim_State.contacts = {};
-        PhoneSim_State.customization = { isMuted: false };
+        PhoneSim_State.customization = { isMuted: false, playerNickname: '我' };
         return;
     }
     try {
@@ -120,7 +144,8 @@ export async function fetchAllContacts() {
         const avatarData = avatarEntry ? JSON.parse(avatarEntry.content || '{}') : {};
 
         const savedCustomization = JSON.parse(parentWin.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION) || '{}');
-        PhoneSim_State.customization = { ...PhoneSim_State.customization, ...savedCustomization };
+        const defaultCustomization = { isMuted: false, playerNickname: '我' };
+        PhoneSim_State.customization = { ...defaultCustomization, ...PhoneSim_State.customization, ...savedCustomization };
 
         if (avatarData[PhoneSim_Config.PLAYER_ID]) {
             PhoneSim_State.customization.playerAvatar = avatarData[PhoneSim_Config.PLAYER_ID];
@@ -137,6 +162,6 @@ export async function fetchAllContacts() {
     } catch (er) {
         console.error('[Phone Sim] Failed to fetch all contacts:', er);
         PhoneSim_State.contacts = {};
-        PhoneSim_State.customization = { isMuted: false };
+        PhoneSim_State.customization = { isMuted: false, playerNickname: '我' };
     }
 }

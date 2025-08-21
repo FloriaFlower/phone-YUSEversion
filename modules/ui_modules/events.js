@@ -45,9 +45,10 @@ export function addEventListeners() {
         .on('click.phonesim', '.back-to-discover-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('Discover'); })
         .on('click.phonesim', '.back-to-chat-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ChatConversation', PhoneSim_State.activeContactId); })
         .on('click.phonesim', '.back-to-members-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('GroupMembers'); })
+        .on('click.phonesim', '.back-to-messages-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ChatApp'); })
         .on('click.phonesim', '#homepage-view .back-to-list-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ChatApp'); })
         .on('click.phonesim', '#discover-moments', () => { PhoneSim_Sounds.play('tap'); UI.showView('Moments'); })
-        .on('click.phonesim', '.chat-list-item', function(e) {
+        .on('click.phonesim', '.chat-list-item, .contact-item.has-chat', function(e) {
             if (!jQuery_API(e.target).closest('.delete-contact-btn').length) {
                 PhoneSim_Sounds.play('tap');
                 UI.showView('ChatConversation', String(jQuery_API(this).data('id')));
@@ -115,10 +116,23 @@ export function addEventListeners() {
             if (i.val().trim() && PhoneSim_State.activeContactId) { 
                 PhoneSim_Sounds.play('send'); 
                 DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, i.val().trim()); 
-                i.val(''); 
+                i.val('').trigger('input');
             } 
         })
-        .on('keypress.phonesim', '.input-field', function(e) { if (e.key === 'Enter') jQuery_API(this).siblings('.send-btn').click(); })
+        .on('input.phonesim', '.chat-input .input-field', function() {
+            const textarea = this;
+            textarea.style.height = 'auto'; // Reset height to recalculate
+            const maxHeight = 100; // Corresponds to max-height in CSS
+            
+            if (textarea.scrollHeight <= maxHeight) {
+                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.style.overflowY = 'hidden';
+            } else {
+                textarea.style.height = maxHeight + 'px';
+                textarea.style.overflowY = 'auto';
+            }
+        })
+        .on('keypress.phonesim', '.input-field', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); jQuery_API(this).siblings('.send-btn').click();} })
         .on('click.phonesim', '.message-actions', function(e) {
             e.stopPropagation();
             PhoneSim_Sounds.play('tap');
@@ -199,6 +213,14 @@ export function addEventListeners() {
             );
             if (result) {
                 await DataHandler.resetAllData();
+            }
+        })
+        .on('click.phonesim', '#change-my-nickname', async () => {
+            PhoneSim_Sounds.play('tap');
+            const currentNickname = PhoneSim_State.customization.playerNickname || '我';
+            const newNickname = await UI.showDialog('修改我的昵称', currentNickname);
+            if (newNickname !== null && newNickname.trim() !== '') {
+                DataHandler.savePlayerNickname(newNickname.trim());
             }
         })
         .on('click.phonesim', '#upload-player-avatar', () => { PhoneSim_Sounds.play('tap'); UI.fileUploadCallback = (d) => DataHandler.saveContactAvatar(PhoneSim_Config.PLAYER_ID, d); fileInput.click(); })
@@ -388,6 +410,19 @@ export function addEventListeners() {
         const uid = menu.data('message-uid');
         const { commentId, momentId } = menu.data();
         menu.hide();
+        
+        if (action === 'add-friend') {
+            const friendId = await UI.showDialog('添加好友', '输入好友ID或昵称...');
+            if(friendId) {
+                TavernHelper_API.triggerSlash(`/send (系统提示：{{user}}尝试添加好友：“${friendId}”。)`);
+            }
+            return;
+        }
+        if (action === 'start-group-chat') {
+            UI.showView('GroupCreation');
+            return;
+        }
+
 
         // Chat Message Actions
         if (uid) {
@@ -413,7 +448,7 @@ export function addEventListeners() {
 
             if (updateType) {
                 if (updateType === 'worldbook') {
-                    await DataHandler.fetchAllContacts();
+                    await DataHandler.fetchAllData();
                 }
                 UI.rerenderCurrentView({ chatUpdated: true });
                 UI.updateCommitButton();
@@ -463,6 +498,7 @@ export function addEventListeners() {
 
     b.on('click.phonesim', '.delete-contact-btn', async function(e) { e.stopPropagation(); PhoneSim_Sounds.play('tap'); const id = jQuery_API(this).data('id'); if (await SillyTavern_API.callGenericPopup(`确定删除此对话吗?`, 'confirm')) { await DataHandler.deleteContact(id); UI.renderContactsList(); } });
     b.on('click.phonesim', '#chat-list-actions-btn', function(e){ e.stopPropagation(); PhoneSim_Sounds.play('tap'); p.find('.phone-sim-menu').hide(); const menu = p.find('#manage-chats-menu'); const button = jQuery_API(this); const panelRect = p[0].getBoundingClientRect(); const buttonRect = button[0].getBoundingClientRect(); const top = (buttonRect.top - panelRect.top) + button.outerHeight() + 5; let left = (buttonRect.left - panelRect.left) - menu.outerWidth() + button.outerWidth(); if (left < 5) left = 5; menu.css({ top, left }).toggle(); });
+    b.on('click.phonesim', '#add-chat-btn', function(e){ e.stopPropagation(); PhoneSim_Sounds.play('tap'); p.find('.phone-sim-menu').hide(); const menu = p.find('#add-chat-menu'); const button = jQuery_API(this); const panelRect = p[0].getBoundingClientRect(); const buttonRect = button[0].getBoundingClientRect(); const top = (buttonRect.top - panelRect.top) + button.outerHeight() + 5; let left = (buttonRect.left - panelRect.left) - menu.outerWidth() + button.outerWidth(); if (left < 5) left = 5; menu.css({ top, left }).toggle(); });
     b.on('click.phonesim', '#moments-actions-btn', function(e){ e.stopPropagation(); PhoneSim_Sounds.play('tap'); p.find('.phone-sim-menu').hide(); const menu = p.find('#manage-moments-menu'); const button = jQuery_API(this); const panelRect = p[0].getBoundingClientRect(); const buttonRect = button[0].getBoundingClientRect(); const top = (buttonRect.top - panelRect.top) + button.outerHeight() + 5; let left = (buttonRect.left - panelRect.left) - menu.outerWidth() + button.outerWidth(); if (left < 5) left = 5; menu.css({ top, left }).toggle(); });
     b.on('click.phonesim', '#action-clear-all-history', async function(){ p.find('#manage-chats-menu').hide(); if(await SillyTavern_API.callGenericPopup('确定清空所有聊天记录吗？', 'confirm')) { PhoneSim_Sounds.play('tap'); await DataHandler.clearAllChatHistory(); await DataHandler.fetchAllData(); UI.renderContactsList(); } });
     b.on('click.phonesim', '#action-clear-all-moments', async function(){ p.find('#manage-moments-menu').hide(); if(await SillyTavern_API.callGenericPopup('确定清空所有动态吗？', 'confirm')) { PhoneSim_Sounds.play('tap'); await DataHandler.clearAllMoments(); await DataHandler.fetchAllData(); if (p.find('#moments-view').hasClass('active')) { UI.renderMomentsView(); } } });
@@ -537,7 +573,7 @@ export function addEventListeners() {
 
     b.on('click.phonesim', (e) => {
         const target = jQuery_API(e.target);
-        if (!target.closest('.phone-sim-menu, .message-actions, .moment-actions-trigger, #chat-list-actions-btn, #moments-actions-btn, .moment-comment.player-comment').length) {
+        if (!target.closest('.phone-sim-menu, .message-actions, .moment-actions-trigger, #chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .moment-comment.player-comment').length) {
             p.find('.phone-sim-menu').hide();
         }
         if (emojiContainer.is(':visible') && !target.closest('.emoji-picker-container, .emoji-btn').length) {

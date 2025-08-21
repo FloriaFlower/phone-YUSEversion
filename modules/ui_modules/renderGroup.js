@@ -70,3 +70,37 @@ export function renderGroupInviteView(groupId) {
         list.append(itemHtml);
     });
 }
+
+export function renderGroupCreationView() {
+    const list = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .group-creation-contact-list`).empty();
+    const confirmBtn = jQuery_API(parentWin.document.body).find('#confirm-group-creation-btn');
+    
+    const potentialMembers = Object.entries(PhoneSim_State.contacts)
+        .filter(([id, contact]) => 
+            !id.startsWith('group_') && 
+            id !== PhoneSim_Config.PLAYER_ID && 
+            contact.profile
+        )
+        .sort(([, a], [, b]) => (a.profile.note || a.profile.nickname).localeCompare(b.profile.note || b.profile.nickname, 'zh-Hans-CN'));
+
+    if (potentialMembers.length === 0) {
+        list.html('<div class="email-empty-state">没有可邀请的联系人</div>');
+        confirmBtn.prop('disabled', true).text('完成(0)');
+        return;
+    }
+    
+    potentialMembers.forEach(([id, contact]) => {
+        const name = contact.profile.note || contact.profile.nickname;
+        const avatar = contact.profile.avatar || UI.generateDefaultAvatar(name);
+        const itemHtml = `
+            <div class="group-creation-contact-item" data-contact-id="${id}">
+                <div class="checkbox"><i class="fas fa-check"></i></div>
+                <img src="${avatar}" class="group-creation-contact-avatar">
+                <span class="group-creation-contact-name">${name}</span>
+            </div>
+        `;
+        list.append(itemHtml);
+    });
+
+    confirmBtn.prop('disabled', true).text('完成(0)');
+}

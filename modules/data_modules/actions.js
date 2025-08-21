@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -129,6 +130,14 @@ export function stagePlayerAction(action) {
 }
 
 export async function stageFriendRequestResponse(uid, action, from_id, from_name) {
+    // Find the request in the state and update it visually first
+    const request = PhoneSim_State.pendingFriendRequests.find(req => req.uid === uid);
+    if (request) {
+        request.status = action === 'accept' ? 'accepted' : 'declined';
+        UI.renderContactsView(); // Re-render the contacts view to show the change
+    }
+    
+    // Stage the action for commit
     PhoneSim_State.stagedPlayerActions.push({ 
         type: 'friend_request_response', 
         uid: uid,
@@ -137,24 +146,6 @@ export async function stageFriendRequestResponse(uid, action, from_id, from_name
         from_name: from_name
     });
     
-    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        let messageFound = false;
-        for (const cId in dbData) {
-            const messages = dbData[cId]?.app_data?.WeChat?.messages;
-            if (messages) {
-                const msg = messages.find(msg => msg.uid === uid);
-                if (msg && msg.requestData) {
-                    msg.requestData.status = action === 'accept' ? 'accepted' : 'declined';
-                    messageFound = true;
-                    break;
-                }
-            }
-        }
-        return dbData;
-    });
-
-    await DataHandler.fetchAllData();
-    UI.rerenderCurrentView({ chatUpdated: true });
     UI.updateCommitButton();
 }
 
@@ -254,9 +245,22 @@ export async function commitStagedActions() {
     }
 
     if (playerActionsToCommit.length > 0) {
+         if (playerActionsToCommit.some(a => a.type === 'friend_request_response')) {
+            await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+                const handledRequestUIDs = playerActionsToCommit
+                    .filter(a => a.type === 'friend_request_response')
+                    .map(a => a.uid);
+                
+                if (dirData.friend_requests) {
+                    dirData.friend_requests = dirData.friend_requests.filter(req => !handledRequestUIDs.includes(req.uid));
+                }
+                return dirData;
+            });
+        }
+
         await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
             playerActionsToCommit.forEach(action => {
-                 if (action.type === 'friend_request_response' && action.action === 'accept') {
+                if (action.type === 'friend_request_response' && action.action === 'accept') {
                     if (!dbData[action.from_id]) {
                         dbData[action.from_id] = {
                             profile: { nickname: action.from_name, note: action.from_name },
@@ -366,9 +370,25 @@ export async function commitStagedActions() {
 export function saveCustomization() {
     try {
         parentWin.localStorage.setItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION, JSON.stringify(PhoneSim_State.customization));
+        UI.applyCustomizations();
+        // Also re-render relevant views if visible
+        if(PhoneSim_State.isPanelVisible) {
+            if (PhoneSim_State.currentView === 'ChatApp' && PhoneSim_State.activeSubviews.chatapp === 'me') {
+                UI.renderMeView();
+            }
+            if (PhoneSim_State.activeContactId) {
+                UI.renderChatView(PhoneSim_State.activeContactId, 'WeChat');
+            }
+        }
+
     } catch (er) {
         console.error('[Phone Sim] Failed to save customization to localStorage:', er);
     }
+}
+
+export async function savePlayerNickname(newName) {
+    PhoneSim_State.customization.playerNickname = newName;
+    saveCustomization();
 }
 
 export async function saveContactAvatar(contactId, base64data) {

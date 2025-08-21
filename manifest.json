@@ -2,10 +2,9 @@
 {
     "display_name": "手机模拟器",
     "author": "Feature Update",
-    "version": "16.1",
-    "description": "一个功能丰富的手机模拟器，支持聊天、朋友圈、浏览器等。v16.1版本新增了全局开关，可在扩展设置中启用或禁用。",
+    "version": "16.8",
+    "description": "一个功能丰富的手机模拟器。v16.8 清理了已不再需要的panel.html文件，完成了UI初始化问题的最终修复。",
     "loading_order": 100,
     "js": "script.js",
-    "css": "style.css",
-    "html": "panel.html"
+    "css": "style.css"
 }

@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -225,7 +226,7 @@ async function _handleChatCommands(chatCommands, msgId) {
             const isNew = !dbData[contactId];
 
             if (isNew) {
-                if (p.type === '私聊' || p.type === '好友请求' || (p.type === '系统提示' && p.requestData)) {
+                if (p.type === '私聊') {
                     dbData[contactId] = { profile: { ...p.profile }, app_data: { WeChat: { messages: [] } } };
                     if (!dirData.contacts) dirData.contacts = {};
                     dirData.contacts[p.profile.note] = contactId;
@@ -255,17 +256,13 @@ async function _handleChatCommands(chatCommands, msgId) {
 
             const newMessage = { uid: `${Date.now()}_${Math.random()}`, timestamp: newTimestamp, sender_id: p.senderId || p.contactId, content: p.content, sourceMsgId: msgId, isSystemNotification: p.isSystemNotification || false };
             
-            if (p.requestData) {
-                newMessage.requestData = p.requestData;
-            }
-
             if (newMessage.content && (newMessage.content.type === 'transfer' || newMessage.content.type === 'red_packet')) {
                 newMessage.content.status = 'unclaimed';
             }
 
             contactObject.app_data.WeChat.messages.push(newMessage);
 
-            if (newMessage.sender_id !== PhoneSim_Config.PLAYER_ID && !newMessage.isSystemNotification && !newMessage.requestData) {
+            if (newMessage.sender_id !== PhoneSim_Config.PLAYER_ID && !newMessage.isSystemNotification) {
                 if (!PhoneSim_State.pendingAnimations[contactId]) {
                     PhoneSim_State.pendingAnimations[contactId] = [];
                 }
@@ -274,7 +271,7 @@ async function _handleChatCommands(chatCommands, msgId) {
 
             if (contactId !== PhoneSim_State.activeContactId && newMessage.sender_id !== PhoneSim_Config.PLAYER_ID) {
                 unreadDeltas[contactId] = (unreadDeltas[contactId] || 0) + 1;
-                if (!newMessage.isSystemNotification && !newMessage.requestData) {
+                if (!newMessage.isSystemNotification) {
                     PhoneSim_Sounds.play('receive');
                     const contactWithId = { ...contactObject, id: contactId };
                     UI.showNotificationBanner(contactWithId, newMessage);
@@ -313,6 +310,26 @@ async function _handleChatCommands(chatCommands, msgId) {
     }
 }
 
+async function _handleFriendRequestCommands(commands) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+        if (!dirData.friend_requests) {
+            dirData.friend_requests = [];
+        }
+        commands.forEach(cmd => {
+            const newRequest = {
+                uid: `req_${Date.now()}_${Math.random()}`,
+                from_id: cmd.from_id,
+                from_name: cmd.from_name,
+                content: cmd.content,
+                timestamp: PhoneSim_Parser.buildTimestamp(cmd.time),
+                status: 'pending'
+            };
+            dirData.friend_requests.push(newRequest);
+        });
+        return dirData;
+    });
+}
+
 export async function mainProcessor(msgId) {
     UI.closeCallUI();
     const messages = TavernHelper_API.getChatMessages(msgId);
@@ -334,7 +351,8 @@ export async function mainProcessor(msgId) {
     }
     PhoneSim_State.lastProcessedMsgId = msgId;
 
-    const chatCommands = commands.filter(cmd => cmd.commandType === 'Chat');
+    const chatCommands = commands.filter(cmd => cmd.commandType === 'Chat' && cmd.interactiveType !== 'friend_request');
+    const friendRequestCommands = commands.filter(cmd => cmd.interactiveType === 'friend_request');
     const momentCommands = commands.filter(cmd => cmd.commandType === 'Moment');
     const momentUpdateCommands = commands.filter(cmd => cmd.commandType === 'MomentUpdate');
     const appCommands = commands.filter(cmd => cmd.commandType === 'App');
@@ -342,8 +360,6 @@ export async function mainProcessor(msgId) {
     const phoneCallCommands = commands.filter(cmd => cmd.commandType === 'PhoneCall');
     const profileUpdateCommands = commands.filter(cmd => cmd.commandType === 'ProfileUpdate');
     const forumCommands = commands.filter(cmd => cmd.commandType === 'Forum');
-    
-    // Browser commands are now handled separately and robustly
     const browserSearchResultCommands = commands.filter(cmd => cmd.app === '浏览器' && cmd.type === '搜索目录');
     const browserWebpageCommand = commands.find(cmd => cmd.app === '浏览器' && cmd.type === '网页');
 
@@ -365,7 +381,6 @@ export async function mainProcessor(msgId) {
         profileUpdated = true;
     }
     
-    // New, robust browser handling
     if (browserSearchResultCommands.length > 0) {
         const searchTerm = PhoneSim_State.pendingBrowserAction?.type === 'search' ? PhoneSim_State.pendingBrowserAction.value : "搜索";
         const results = browserSearchResultCommands.map(cmd => ({
@@ -381,6 +396,10 @@ export async function mainProcessor(msgId) {
         browserUpdated = true;
     }
 
+    if (friendRequestCommands.length > 0) {
+        await _handleFriendRequestCommands(friendRequestCommands);
+        chatUpdated = true; // To trigger UI refresh
+    }
     if (chatCommands.length > 0) {
         await _handleChatCommands(chatCommands, msgId);
         chatUpdated = true;

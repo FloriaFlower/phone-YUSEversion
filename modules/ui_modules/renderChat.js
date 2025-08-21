@@ -99,6 +99,68 @@ export function renderContactsList() {
     });
 }
 
+export function renderContactsView() {
+    const listContent = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .contacts-list-content`).empty();
+
+    // Render friend requests
+    if (PhoneSim_State.pendingFriendRequests.length > 0) {
+        listContent.append('<div class="contact-group-header">新的朋友</div>');
+        PhoneSim_State.pendingFriendRequests.forEach(req => {
+            const avatar = UI.generateDefaultAvatar(req.from_name);
+            let actionsHtml;
+            if (req.status === 'pending') {
+                actionsHtml = `<div class="request-actions">
+                    <button class="request-btn accept-btn" data-action="accept">接受</button>
+                </div>`;
+            } else {
+                actionsHtml = `<div class="request-status">${req.status === 'accepted' ? '已添加' : '已忽略'}</div>`;
+            }
+
+            const itemHtml = `
+                <div class="contact-item new-friend-request-item" data-uid="${req.uid}" data-from-id="${req.from_id}" data-from-name="${req.from_name}">
+                    <img src="${avatar}" class="contact-item-avatar">
+                    <div class="request-info">
+                        <div class="contact-item-name">${req.from_name}</div>
+                        <div class="request-message">${req.content}</div>
+                    </div>
+                    ${actionsHtml}
+                </div>`;
+            listContent.append(itemHtml);
+        });
+    }
+
+    // Render existing contacts
+    listContent.append('<div class="contact-group-header">联系人</div>');
+    const sortedContacts = Object.entries(PhoneSim_State.contacts)
+        .filter(([id, c]) => id !== PhoneSim_Config.PLAYER_ID && !id.startsWith('group_') && c.profile)
+        .sort(([, a], [, b]) => (a.profile.note || a.profile.nickname).localeCompare(b.profile.note || b.profile.nickname, 'zh-Hans-CN'));
+    
+    for (const [id, c] of sortedContacts) {
+        const name = c.profile.note || c.profile.nickname;
+        const avatar = c.profile.avatar || UI.generateDefaultAvatar(name);
+        const hasChat = c.app_data?.WeChat?.messages?.length > 0;
+        listContent.append(`<div class="contact-item ${hasChat ? 'has-chat' : ''}" data-id="${id}"><img src="${avatar}" class="contact-item-avatar"><span class="contact-item-name">${name}</span></div>`);
+    }
+}
+
+export function renderMeView() {
+    const content = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .me-content`).empty();
+    const avatar = PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar(PhoneSim_State.customization.playerNickname);
+    const nickname = PhoneSim_State.customization.playerNickname || '我';
+    const id = PhoneSim_Config.PLAYER_ID;
+    
+    const html = `
+        <div class="me-profile-card">
+            <img src="${avatar}" class="me-avatar">
+            <div class="me-info">
+                <h2 class="me-nickname">${nickname}</h2>
+                <p class="me-id">ID: ${id}</p>
+            </div>
+        </div>
+    `;
+    content.html(html);
+}
+
 
 async function _renderMessages(messagesContainer, allMessages, isGroup) {
     if (isRendering) return;
@@ -117,8 +179,6 @@ async function _renderMessages(messagesContainer, allMessages, isGroup) {
         
         if (s.isSystemNotification) {
             html += UI.renderSystemMessage(s);
-        } else if (s.requestData) {
-            html += UI.renderInteractiveMessage(s);
         } else {
             html += UI.renderSingleMessage(s, isGroup);
         }

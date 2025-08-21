@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../config.js';
 import { PhoneSim_State } from './state.js';
 
@@ -248,21 +249,12 @@ export const PhoneSim_Parser = {
                 finalMessage.contactId = params.id;
             } else if (params.type === '系统提示') {
                 const content = params.content || '';
-                if (content.includes('添加') && content.includes('好友')) {
-                    const nameMatch = content.match(/我是\s*([^。,\s]+)/);
-                    const from_name = nameMatch ? nameMatch[1].trim() : params.contact_id;
-                    
-                    finalMessage.commandType = 'Chat';
-                    finalMessage.contactId = params.contact_id;
-                    finalMessage.senderId = params.contact_id;
-                    finalMessage.requestData = {
-                        type: 'friend_request',
-                        from_id: params.contact_id,
-                        from_name: from_name,
-                        status: 'pending'
-                    };
-                    finalMessage.content = content;
-                    finalMessage.profile = { nickname: from_name, note: from_name };
+                if (content.includes('请求添加你为好友')) {
+                    const nameMatch = content.match(/“(.+)”请求添加你为好友/);
+                    finalMessage.interactiveType = 'friend_request';
+                    finalMessage.from_id = params.contact_id;
+                    finalMessage.from_name = nameMatch ? nameMatch[1] : params.contact_id;
+                    finalMessage.content = '请求添加你为好友';
                 } else {
                     finalMessage.commandType = 'Chat';
                     finalMessage.isSystemNotification = true;
@@ -270,14 +262,7 @@ export const PhoneSim_Parser = {
                     finalMessage.content = this._parseContent(content);
                 }
             } else if (params.type === '好友请求') {
-                finalMessage.commandType = 'Chat';
-                finalMessage.contactId = params.from_id;
-                finalMessage.senderId = params.from_id;
                 finalMessage.interactiveType = 'friend_request';
-                finalMessage.from_id = params.from_id;
-                finalMessage.from_name = params.from_name;
-                finalMessage.content = params.content || `你好, 我是${params.from_name}`;
-                finalMessage.profile = { nickname: params.from_name, note: params.from_name };
             } else {
                 return null;
             }

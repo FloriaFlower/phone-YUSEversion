@@ -169,7 +169,7 @@ export function generateDefaultAvatar(name) {
 
 export function _getContactName(contactId) {
     if (contactId === PhoneSim_Config.PLAYER_ID) {
-        return '我';
+        return PhoneSim_State.customization.playerNickname || '我';
     }
     const contact = PhoneSim_State.contacts[contactId];
     if (contact && contact.profile) {
@@ -184,17 +184,22 @@ export function updateGlobalUnreadCounts() {
     if (!PhoneSim_State.contacts) return;
     const totalUnreadChats = Object.values(PhoneSim_State.contacts).reduce((sum, contact) => sum + (contact.unread || 0), 0);
     const totalUnreadEmails = PhoneSim_State.emails.filter(e => !e.read).length;
-    const totalNotifications = totalUnreadChats + totalUnreadEmails;
+    const totalFriendRequests = PhoneSim_State.pendingFriendRequests.filter(req => req.status === 'pending').length;
+    const totalNotifications = totalUnreadChats + totalUnreadEmails + totalFriendRequests;
 
     const toggleBtn = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.TOGGLE_BUTTON_ID}`);
     let badge = toggleBtn.find('.unread-badge');
     if (totalNotifications > 0) badge.text(totalNotifications > 99 ? '99+' : totalNotifications).show(); else badge.hide();
 
     const chatAppBadge = jQuery_API(`${P} .app-block[data-appid="ChatApp"] .unread-badge`);
-    if(totalUnreadChats > 0) chatAppBadge.text(totalUnreadChats > 99 ? '99+' : totalUnreadChats).show(); else chatAppBadge.hide();
+    const totalChatAppNotifications = totalUnreadChats + totalFriendRequests;
+    if(totalChatAppNotifications > 0) chatAppBadge.text(totalChatAppNotifications > 99 ? '99+' : totalChatAppNotifications).show(); else chatAppBadge.hide();
     
     const emailAppBadge = jQuery_API(`${P} .app-block[data-appid="EmailApp"] .unread-badge`);
     if(totalUnreadEmails > 0) emailAppBadge.text(totalUnreadEmails > 99 ? '99+' : totalUnreadEmails).show(); else emailAppBadge.hide();
+
+    const contactsTabBadge = jQuery_API(`${P} .chatapp-bottom-nav .nav-item[data-target="contacts"] .nav-badge`);
+    if (totalFriendRequests > 0) contactsTabBadge.show(); else contactsTabBadge.hide();
 }
 
 export function resetUIPosition() {

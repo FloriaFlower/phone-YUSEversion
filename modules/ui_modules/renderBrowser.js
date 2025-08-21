@@ -185,25 +185,44 @@ export function updateAddressBar() {
      jQuery_API(parentWin.document.body).find('#browser-address-input').val(displayValue);
 }
 
-export function setLoading(isLoading, text = '加载中...') {
+export function setLoading(isLoading) {
     const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
     const resultsList = p.find('#browser-search-results-list');
     const pageContent = p.find('#webpage-content');
-    const loaderHtml = `<div class="browser-loader">${text}</div>`;
 
     if (isLoading) {
         resultsList.empty();
         pageContent.empty();
 
-        if (PhoneSim_State.pendingBrowserAction?.type === 'search') {
-            resultsList.html(loaderHtml);
+        const searchSkeleton = `
+            <div class="skeleton-search-result">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-url"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+            </div>`.repeat(3);
+
+        const webpageSkeleton = `
+            <div class="skeleton-webpage">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+                <br>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+            </div>`;
+
+        const actionType = PhoneSim_State.pendingBrowserAction?.type;
+
+        if (actionType === 'search') {
+            resultsList.html(searchSkeleton);
             showBrowserSubview('search-results');
-        } else {
-            pageContent.html(loaderHtml);
+        } else { // 'pageload' or default
+            pageContent.html(webpageSkeleton);
             showBrowserSubview('webpage');
         }
-    } else {
-        resultsList.find('.browser-loader').remove();
-        pageContent.find('.browser-loader').remove();
     }
+    // No 'else' block needed, as the content areas are cleared and repopulated
+    // by their respective render functions when new data arrives.
 }
