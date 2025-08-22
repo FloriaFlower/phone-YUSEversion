@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -42,7 +43,7 @@ export function addEventListeners() {
         
         if (isInsidePanel) {
             const richMediaPanel = p.find('.rich-media-panel');
-            if (richMediaPanel.is(':visible') && !target.closest('.rich-media-panel, .rich-media-btn').length) {
+            if (richMediaPanel.is(':visible') && !target.closest('.rich-media-panel, .emoji-btn').length) {
                 richMediaPanel.hide();
             }
              if (!target.closest('.phone-sim-menu, #chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .message-actions, .moment-actions-trigger, .forum-actions-trigger, .rich-message.transfer-message.unclaimed, .rich-media-btn').length) {
@@ -90,6 +91,38 @@ export function addEventListeners() {
     p.on('click.phonesim', '.webpage-content a[data-download="true"]', (e) => { e.preventDefault(); const link = jQuery_API(e.target); SillyTavern_API.callGenericPopup(`<b>文件下载</b><br><br><b>文件名:</b> ${link.attr('href')}<br><b>描述:</b> ${link.data('description')}<br><br><i>(此功能为模拟，不会实际下载文件)</i>`, 'text'); });
     
     // --- FORUM & LIVE CENTER APPS ---
+    p.on('click.phonesim', '#new-forum-content-btn, #new-live-content-btn, #new-forum-post-btn, #new-live-stream-btn', function() {
+        PhoneSim_Sounds.play('tap');
+        const id = jQuery_API(this).attr('id');
+        const context = (id.includes('forum')) ? 'forum' : 'live';
+        UI.showView('Creation', { context: context });
+    });
+    p.on('click.phonesim', '#creation-back-btn', function() {
+        PhoneSim_Sounds.play('tap');
+        UI.showView(PhoneSim_State.previousView || 'HomeScreen');
+    });
+    p.on('submit.phonesim', '#creation-form', function(e) {
+        e.preventDefault();
+        PhoneSim_Sounds.play('send');
+        const context = PhoneSim_State.creationContext;
+        const board = p.find('#creation-board-input').val().trim();
+        const title = p.find('#creation-title-input').val().trim();
+        const content = p.find('#creation-content-input').val().trim();
+
+        if (!board || !title || !content) {
+            SillyTavern_API.callGenericPopup('所有字段均为必填项。', 'text');
+            return;
+        }
+
+        if (context === 'forum') {
+            DataHandler.stagePlayerAction({ type: 'new_forum_post', postId: `staged_post_${Date.now()}`, boardName: board, title: title, content: content });
+            UI.showView('ForumApp');
+        } else if (context === 'live') {
+            DataHandler.stagePlayerAction({ type: 'new_live_stream', streamId: `staged_stream_${Date.now()}`, boardName: board, title: title, content: content });
+            UI.showView('LiveCenterApp');
+        }
+    });
+
     p.on('click.phonesim', '.forum-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('ForumPostList', jQuery_API(this).data('board-id')); });
     p.on('click.phonesim', '.forum-post-item', function() { PhoneSim_Sounds.play('open'); UI.showView('ForumPostDetail', jQuery_API(this).data('post-id')); });
     p.on('click.phonesim', '.live-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('LiveStreamList', jQuery_API(this).data('board-id')); });
@@ -177,7 +210,13 @@ export function addEventListeners() {
     inputField.on('keypress.phonesim', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
     p.on('click.phonesim', '.close-reply-preview', () => UI.hideReplyPreview());
     p.on('click.phonesim', '.rich-message.location-message', function() { PhoneSim_Sounds.play('tap'); const location = jQuery_API(this).data('location'); if (location) { SillyTavern_API.callGenericPopup(`<b>📍 地理位置</b><br><br>${location}`, 'text'); } });
-    p.on('click.phonesim', '.pseudo-image-cover', function() { PhoneSim_Sounds.play('tap'); jQuery_API(this).hide().siblings('.pseudo-image-text').html(jQuery_API(this).parent().data('text')).show(); });
+    p.on('click.phonesim', '.pseudo-image-cover', function() { 
+        PhoneSim_Sounds.play('tap'); 
+        const cover = jQuery_API(this);
+        const textDiv = cover.siblings('.pseudo-image-text');
+        cover.hide();
+        textDiv.show();
+    });
     p.on('click.phonesim', '.voice-message', function(){ PhoneSim_Sounds.play('tap'); jQuery_API(this).toggleClass('expanded'); });
     p.on('click.phonesim', '.edit-note-btn', function() { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeContactId) { const contact = PhoneSim_State.contacts[PhoneSim_State.activeContactId]; if (!contact || !contact.profile) return; UI.showDialog('设置备注', contact.profile.note || contact.profile.nickname || '').then(n => { if (n !== null) DataHandler.updateContactNote(PhoneSim_State.activeContactId, n).then(() => DataHandler.fetchAllData()); }); } });
     p.on('click.phonesim', '.call-btn', () => { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeContactId) DataHandler.initiateVoiceCall(PhoneSim_State.activeContactId); });
@@ -195,7 +234,7 @@ export function addEventListeners() {
 
     // --- RICH MEDIA & EMOJI PICKER ---
     const richMediaPanel = p.find('.rich-media-panel');
-    p.on('click.phonesim', '.rich-media-btn', function(e) {
+    p.on('click.phonesim', '.emoji-btn', function(e) {
         e.stopPropagation(); PhoneSim_Sounds.play('tap');
         richMediaPanel.toggle();
         if (richMediaPanel.is(':visible')) {
@@ -308,6 +347,21 @@ export function addEventListeners() {
             case 'upload-local-image': UI.handleFileUpload('localImageUpload', PhoneSim_State.activeContactId); return;
             case 'send-image-url': { const url = await UI.showDialog('输入图片URL'); if (url) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'image', url }, null, '[图片]'); return; }
             case 'send-image-text': { const text = await UI.showDialog('输入图片描述'); if (text) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'pseudo_image', text }, null, `[图片：${text}]`); return; }
+            case 'send-voice-message': { 
+                const voiceInput = await UI.showDialog('输入语音内容', '格式: 时长"|文字内容, 例如: 8"|你好呀');
+                if (voiceInput) {
+                    const parts = voiceInput.split('|');
+                    const duration = parts[0]?.trim();
+                    const text = parts[1]?.trim();
+                    if (duration && text) {
+                        const descriptionForAI = `[语音：${duration}]`;
+                        DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'voice', duration, text }, null, descriptionForAI);
+                    } else {
+                        SillyTavern_API.callGenericPopup('格式不正确，请使用 "时长"|内容" 格式。', 'text');
+                    }
+                }
+                return;
+            }
             case 'send-transfer': { const amount = await UI.showDialog('输入转账金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'transfer', amount: parseFloat(amount).toFixed(2), note: '转账', status: 'claimed' }, null, `[转账：${amount}]`); return; }
             case 'send-red-packet': { const amount = await UI.showDialog('输入红包金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'red_packet', amount: parseFloat(amount).toFixed(2), note: '恭喜发财，大吉大利', status: 'claimed' }, null, `[红包：${amount}]`); return; }
             case 'send-location': { const loc = await UI.showDialog('输入位置'); if (loc) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'location', text: loc }, null, `[位置：${loc}]`); return; }

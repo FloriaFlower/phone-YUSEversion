@@ -10,6 +10,13 @@
     margin: 4px 0;
     display: block;
 }
+/* New rule to constrain main message images */
+#phone-sim-panel-v10-0 .message-content .inline-image {
+    max-width: 50%;
+    max-height: 200px;
+    object-fit: cover;
+}
+
 #phone-sim-panel-v10-0 .mixed-content > * {
     max-width: 100%;
 }
@@ -24,12 +31,22 @@
     color: #555;
     font-style: italic;
 }
+/* New, specific image sizing rules */
+#phone-sim-panel-v10-0 .moment-comment .inline-image,
+#phone-sim-panel-v10-0 .reply-content-wrapper .inline-image {
+    max-width: 60px;
+    max-height: 80px;
+    object-fit: cover;
+    margin: 8px 0;
+    border-radius: 6px;
+}
+
 #phone-sim-panel-v10-0 .post-detail-body .inline-image,
-#phone-sim-panel-v10-0 .reply-content .inline-image,
 #phone-sim-panel-v10-0 .webpage-content .inline-image {
     max-width: 90%;
     margin-top: 8px;
     margin-bottom: 8px;
+    border-radius: 8px;
 }
 
 

@@ -41,6 +41,7 @@
                 <div class="menu-item" data-action="upload-local-image"><i class="fas fa-image fa-fw"></i> 本地图片</div>
                 <div class="menu-item" data-action="send-image-url"><i class="fas fa-link fa-fw"></i> 图床图片</div>
                 <div class="menu-item" data-action="send-image-text"><i class="fas fa-quote-right fa-fw"></i> 文字描述图片</div>
+                <div class="menu-item" data-action="send-voice-message"><i class="fas fa-microphone fa-fw"></i> 语音消息</div>
                 <div class="menu-item" data-action="send-transfer"><i class="fas fa-exchange-alt fa-fw"></i> 转账</div>
                 <div class="menu-item" data-action="send-red-packet"><i class="fas fa-envelope-open-text fa-fw"></i> 红包</div>
                 <div class="menu-item" data-action="send-location"><i class="fas fa-map-marker-alt fa-fw"></i> 位置</div>
@@ -77,13 +78,35 @@
 
         <div id="browserapp-view" class="view" data-nav-level="1"><div class="browser-header"><div class="browser-nav-controls"><button id="browser-back-btn" class="nav-btn"><i class="fas fa-chevron-left"></i></button></div><div class="browser-address-bar-container"><i class="fas fa-search address-bar-icon"></i><input type="text" id="browser-address-input" placeholder="搜索或输入网址"><button id="browser-bookmark-toggle-btn" class="bookmark-btn" disabled><i class="far fa-star"></i></button><button id="browser-go-btn"><i class="fas fa-arrow-right"></i></button></div><div class="browser-menu-controls"><button id="browser-home-btn" class="nav-btn"><i class="fas fa-home"></i></button><button id="browser-bookmarks-btn" class="nav-btn"><i class="fas fa-book"></i></button></div></div><div class="browser-content"><div id="search-home-subview" class="browser-subview active"><div class="search-home-content"><h1 class="search-engine-logo">SimSearch</h1><div class="quick-search-grid"><div class="quick-search-item" data-term="Starlight学院"><i class="fas fa-university"></i><span>学院官网</span></div><div class="quick-search-item" data-term="最新新闻"><i class="fas fa-newspaper"></i><span>新闻</span></div><div class="quick-search-item" data-term="校园地图"><i class="fas fa-map-marked-alt"></i><span>地图</span></div><div class="quick-search-item" data-term="天气"><i class="fas fa-cloud-sun"></i><span>天气</span></div></div></div></div><div id="search-results-subview" class="browser-subview"><div id="browser-search-results-list" class="search-results-list"></div></div><div id="webpage-subview" class="browser-subview"><div id="webpage-content" class="webpage-content"></div></div><div id="history-bookmarks-subview" class="browser-subview" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-browser-btn"><i class="fas fa-chevron-left"></i></button><h3>资料库</h3><button id="clear-history-btn" class="header-action-btn">清除</button></div><div class="tabs"><div class="tab-item active" data-tab="history">历史记录</div><div class="tab-item" data-tab="bookmarks">书签</div><div class="tab-item" data-tab="directory">网站目录</div></div><div class="tab-content"><div class="list-container active" data-tab-content="history"><div id="history-list"></div></div><div class="list-container" data-tab-content="bookmarks"><div id="bookmarks-list"></div></div><div class="list-container" data-tab-content="directory"><div id="directory-list"></div></div></div></div></div></div>
 
-        <div id="forumapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>论坛</h3></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索板块..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="forum-board-list-content"></div></div>
-        <div id="forumpostlist-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-board-list-btn"><i class="fas fa-chevron-left"></i></button><h3>板块</h3><div id="new-forum-post-btn"><i class="fas fa-plus"></i></div></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索帖子..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="forum-post-list-content"></div></div>
+        <div id="forumapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>论坛</h3><div class="header-actions" id="new-forum-content-btn"><i class="fas fa-plus"></i></div></div><div class="forum-board-list-content"></div></div>
+        <div id="forumpostlist-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-board-list-btn"><i class="fas fa-chevron-left"></i></button><h3>板块</h3><div class="header-actions" id="new-forum-post-btn"><i class="fas fa-plus"></i></div></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索帖子..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="forum-post-list-content"></div></div>
         <div id="forumpostdetail-view" class="view" data-nav-level="3"><div class="app-header"><button class="app-back-btn back-to-post-list-btn"><i class="fas fa-chevron-left"></i></button><h3>帖子详情</h3></div><div class="forum-post-detail-content"></div><div class="forum-reply-bar"><input type="text" class="forum-reply-input" placeholder="回复..."><button class="forum-reply-send-btn"><i class="fas fa-paper-plane"></i></button></div></div>
 
-        <div id="livecenterapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>直播中心</h3></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索板块..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="live-board-list-content"></div></div>
-        <div id="livestreamlist-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-livecenter-btn"><i class="fas fa-chevron-left"></i></button><h3>板块</h3></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索直播间..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="live-stream-list-content"></div></div>
+        <div id="livecenterapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>直播中心</h3><div class="header-actions" id="new-live-content-btn"><i class="fas fa-plus"></i></div></div><div class="live-board-list-content"></div></div>
+        <div id="livestreamlist-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-livecenter-btn"><i class="fas fa-chevron-left"></i></button><h3>板块</h3><div class="header-actions" id="new-live-stream-btn"><i class="fas fa-plus"></i></div></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索直播间..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="live-stream-list-content"></div></div>
         <div id="livestreamroom-view" class="view" data-nav-level="3"><div class="app-header"><button class="app-back-btn back-to-livestreamlist-btn"><i class="fas fa-chevron-left"></i></button><h3>直播间</h3></div><div class="stream-video-desc"></div><div class="stream-danmaku-container"></div><div class="stream-input-bar"><input type="text" class="stream-danmaku-input" placeholder="发个弹幕呗~"><button class="stream-danmaku-send-btn">发送</button></div></div>
+
+        <div id="creation-view" class="view" data-nav-level="90">
+            <div class="app-header">
+                <button class="app-back-btn" id="creation-back-btn"><i class="fas fa-chevron-left"></i></button>
+                <h3 id="creation-view-title">创建</h3>
+            </div>
+            <form id="creation-form">
+                <div class="creation-form-group">
+                    <label for="creation-board-input">板块</label>
+                    <input type="text" id="creation-board-input" placeholder="例如: 校园生活" required>
+                </div>
+                <div class="creation-form-group">
+                    <label for="creation-title-input">标题</label>
+                    <input type="text" id="creation-title-input" placeholder="请输入标题" required>
+                </div>
+                <div class="creation-form-group">
+                    <label for="creation-content-input">内容</label>
+                    <textarea id="creation-content-input" rows="8" placeholder="请输入内容..." required></textarea>
+                </div>
+                <button type="submit" id="creation-submit-btn">发布</button>
+            </form>
+        </div>
     </div>
 
     <!-- Modals and Overlays -->

@@ -46,17 +46,31 @@ export async function renderLiveStreamList(boardId) {
     const boardData = PhoneSim_State.liveCenterData[boardId];
     const streams = boardData?.streams || [];
 
-    if (streams.length === 0) {
+    const stagedStreams = PhoneSim_State.stagedPlayerActions
+        .filter(a => a.type === 'new_live_stream' && a.boardName === boardName)
+        .map(a => ({
+            streamerId: PhoneSim_Config.PLAYER_ID,
+            streamerName: PhoneSim_State.customization.playerNickname || '我',
+            title: a.title,
+            viewerCount: 0,
+            isStaged: true
+        }));
+
+    const allStreams = [...stagedStreams, ...streams];
+
+    if (allStreams.length === 0) {
         content.html('<div class="email-empty-state">该板块暂无直播</div>');
         return;
     }
 
-    streams.forEach(stream => {
+    allStreams.forEach(stream => {
         const streamer = PhoneSim_State.contacts[stream.streamerId];
-        const avatar = streamer?.profile?.avatar || UI.generateDefaultAvatar(stream.streamerName);
+        const avatar = (stream.streamerId === PhoneSim_Config.PLAYER_ID) 
+            ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar(stream.streamerName))
+            : (streamer?.profile?.avatar || UI.generateDefaultAvatar(stream.streamerName));
 
         const itemHtml = `
-            <div class="live-stream-item search-filterable-item" data-streamer-id="${stream.streamerId}">
+            <div class="live-stream-item search-filterable-item ${stream.isStaged ? 'staged' : ''}" data-streamer-id="${stream.streamerId}">
                 <div class="stream-thumbnail-wrapper">
                     <div class="stream-viewer-count">
                         <i class="fas fa-eye"></i>

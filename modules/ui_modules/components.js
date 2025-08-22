@@ -1,6 +1,7 @@
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
+import { PhoneSim_Parser } from '../parser.js';
 
 let jQuery_API, parentWin, UI, DataHandler;
 
@@ -45,7 +46,6 @@ export function renderInteractiveMessage(message) {
         actionsHtml = `<div class="friend-request-status">${statusText}</div>`;
     }
 
-    // Refactored structure: Removed avatar, simplified layout, and consolidated data attributes on the bubble.
     return `
         <div class="message system-notification" data-uid="${uid}">
             <div class="friend-request-bubble" data-uid="${uid}" data-from-id="${from_id}" data-from-name="${from_name}">
@@ -59,19 +59,23 @@ export function renderInteractiveMessage(message) {
         </div>`;
 }
 
-
 /**
- * Renders generic rich content that can include text, images, and special links.
- * This is used by browser and forum views.
- * @param {*} content - The content to render (string, array of parts, or object).
- * @param {object} context - Contextual options, e.g., { isMoment: true } for non-interactive pseudo-images.
+ * Renders any type of content (string, object, or array) into its corresponding HTML representation for display.
+ * This is the single source of truth for all content rendering.
+ * @param {*} content - The content to render.
+ * @param {object} context - Contextual options, e.g., { isMoment: true }.
  * @returns {string} - The generated HTML string.
  */
 export function renderRichContent(content, context = {}) {
-    const { isMoment = false } = context;
+    const { isMoment = false, uid = '' } = context;
     const sanitize = (text) => jQuery_API('<div>').text(text).html();
 
     if (typeof content === 'string') {
+        const parsed = PhoneSim_Parser._parseContent(content);
+        if (parsed !== content) {
+            return UI.renderRichContent(parsed, context);
+        }
+        
         const downloadLinkRegex = /\[([^\]]+)\]\(([^|]+)\|([^)]+)\)/g;
         let processedText = sanitize(content).replace(/\\n/g, '<br>');
         processedText = processedText.replace(downloadLinkRegex, (match, linkText, fileName, description) => {
@@ -80,105 +84,31 @@ export function renderRichContent(content, context = {}) {
         return processedText;
     }
     
-    const renderPart = (p) => {
-        if (p.type === 'text') return renderRichContent(p.value, context);
-        if (p.type === 'image') return `<img src="${sanitize(p.url)}" class="inline-image" alt="图片">`;
-        if (p.type === 'pseudo_image') {
-            const text = sanitize(p.text);
-            if (isMoment) {
-                return `<div class="rich-message pseudo-image-moment"><i class="fas fa-image"></i> [图片] ${text}</div>`;
-            }
-            return `<div class="rich-message pseudo-image-message" data-text="${text}"><div class="pseudo-image-cover"><i class="fas fa-image"></i> [图片] 点击查看</div><div class="pseudo-image-text"></div></div>`;
-        }
-        return '';
-    };
-    
     if (Array.isArray(content)) {
-        return `<div class="mixed-content">${content.map(renderPart).join('')}</div>`;
-    }
-    
-    if (typeof content === 'object' && content !== null) {
-        if (content.type === 'image' || content.type === 'pseudo_image') return renderPart(content);
-    }
-    
-    return '';
-}
-
-export function renderSystemMessage(message) {
-    const { content, uid } = message;
-    let textContent;
-
-    if (typeof content === 'object' && content !== null && content.type === 'call_end') {
-        textContent = `通话已结束，时长 ${content.duration}`;
-    } else {
-        textContent = jQuery_API('<div>').text(content).html();
-    }
-    
-    return `<div class="message system-notification" data-uid="${uid}"><span>${textContent}</span></div>`;
-}
-
-
-export function renderSingleMessage(s, isGroup) {
-    const isPlayer = s.sender_id === PhoneSim_Config.PLAYER_ID;
-    const senderName = UI._getContactName(s.sender_id);
-    
-    if (s.recalled) {
-        const recalledBy = isPlayer ? '你' : senderName;
-        const recalledText = `${recalledBy}撤回了一条消息`;
-        return `<div class="message system-notification" data-uid="${s.uid}"><span>${recalledText}</span></div>`;
-    }
-
-    const senderContact = PhoneSim_State.contacts[s.sender_id];
-    const senderAvatar = isPlayer 
-        ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar('我')) 
-        : (senderContact?.profile?.avatar || UI.generateDefaultAvatar(senderName));
-        
-    const contentHtml = UI._renderRichMessage(s);
-    
-    let messageClass = `message ${isPlayer ? 'sent' : 'received'} ${s.isStaged ? 'staged' : ''}`;
-    
-    const messageActionsHtml = `<div class="message-actions" data-message-uid="${s.uid}" title="更多操作"><i class="fas fa-ellipsis-h"></i></div>`;
-    const avatarHtml = `<div class="avatar-container"><img src="${senderAvatar}" class="avatar clickable-avatar" data-contact-id="${s.sender_id}"></div>`;
-    const statusHtml = isPlayer && s.isStaged ? `<div class="message-status"><i class="fas fa-clock" title="发送中"></i></div>` : '';
-    const senderNameHtml = isGroup && !isPlayer ? `<div class="sender-name">${senderName}</div>` : '';
-
-    const bubbleContent = `<div class="message-content">${contentHtml}</div>`;
-
-    if (isPlayer) {
-        return `<div class="${messageClass}" data-uid="${s.uid}">
-                    <div class="message-wrapper-with-actions">
-                        <div class="message-wrapper">${bubbleContent}</div>
-                        ${messageActionsHtml}${statusHtml}
-                    </div>
-                    ${avatarHtml}
-                </div>`;
-    } else {
-        return `<div class="${messageClass}" data-uid="${s.uid}">
-                    ${avatarHtml}
-                    <div class="message-wrapper-with-actions">
-                        <div class="message-wrapper">${senderNameHtml}${bubbleContent}</div>
-                        ${messageActionsHtml}
-                    </div>
-                </div>`;
-    }
-}
-
-export function _renderRichMessage(message, isMoment = false) {
-    const content = message.content;
-    const uid = message.uid;
-    const sanitize = (text) => jQuery_API('<div>').text(text).html();
-
-    // Defer to the generic renderer for text, mixed content, and basic images
-    if (typeof content === 'string' || Array.isArray(content) || (content && (content.type === 'image' || content.type === 'pseudo_image'))) {
-        return UI.renderRichContent(content, { isMoment });
+        return `<div class="mixed-content">${content.map(p => UI.renderRichContent(p, context)).join('')}</div>`;
     }
 
     if (typeof content === 'object' && content !== null) {
         switch(content.type) {
+            case 'text':
+                return renderRichContent(content.value, context);
+            case 'image':
+                return `<div class="rich-message"><img src="${sanitize(content.url)}" class="inline-image" alt="图片"></div>`;
             case 'local_image':
-                return `<img src="${content.base64}" class="inline-image" alt="本地图片预览">`;
-            case 'voice': return `<div class="rich-message voice-message" data-text="${sanitize(content.text)}"><div class="voice-bar"><div class="voice-wave"><span></span><span></span><span></span><span></span></div><span class="voice-duration">${sanitize(content.duration)}</span></div><div class="voice-transcript">${sanitize(content.text)}</div></div>`;
-            case 'transfer': case 'red_packet':
+                return `<div class="rich-message"><img src="${content.base64}" class="inline-image" alt="本地图片预览"></div>`;
+            case 'pseudo_image':
+                const text = sanitize(content.text);
+                if (isMoment) {
+                    return `<div class="rich-message pseudo-image-moment"><i class="fas fa-image"></i> [图片] ${text}</div>`;
+                }
+                return `<div class="rich-message pseudo-image-message">
+                            <div class="pseudo-image-cover"><i class="fas fa-image"></i> [图片] 点击查看</div>
+                            <div class="pseudo-image-text" style="display:none;">${text}</div>
+                        </div>`;
+            case 'voice': 
+                return `<div class="rich-message voice-message" data-text="${sanitize(content.text)}"><div class="voice-bar"><div class="voice-wave"><span></span><span></span><span></span><span></span></div><span class="voice-duration">${sanitize(content.duration)}</span></div><div class="voice-transcript">${sanitize(content.text)}</div></div>`;
+            case 'transfer': 
+            case 'red_packet':
                 const isRedPacket = content.type === 'red_packet';
                 const isClaimed = content.status === 'claimed';
                 const statusText = isClaimed ? (isRedPacket ? '红包已领取' : '已收款') : (isRedPacket ? '领取红包' : '待查收');
@@ -219,6 +149,67 @@ export function _renderRichMessage(message, isMoment = false) {
     }
      return `<div>[未知格式消息]</div>`;
 }
+
+
+export function renderSystemMessage(message) {
+    const { content, uid } = message;
+    let textContent;
+
+    if (typeof content === 'object' && content !== null && content.type === 'call_end') {
+        textContent = `通话已结束，时长 ${content.duration}`;
+    } else {
+        textContent = jQuery_API('<div>').text(content).html();
+    }
+    
+    return `<div class="message system-notification" data-uid="${uid}"><span>${textContent}</span></div>`;
+}
+
+
+export function renderSingleMessage(s, isGroup) {
+    const isPlayer = s.sender_id === PhoneSim_Config.PLAYER_ID;
+    const senderName = UI._getContactName(s.sender_id);
+    
+    if (s.recalled) {
+        const recalledBy = isPlayer ? '你' : senderName;
+        const recalledText = `${recalledBy}撤回了一条消息`;
+        return `<div class="message system-notification" data-uid="${s.uid}"><span>${recalledText}</span></div>`;
+    }
+
+    const senderContact = PhoneSim_State.contacts[s.sender_id];
+    const senderAvatar = isPlayer 
+        ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar('我')) 
+        : (senderContact?.profile?.avatar || UI.generateDefaultAvatar(senderName));
+        
+    const contentHtml = renderRichContent(s.content, { uid: s.uid });
+    
+    let messageClass = `message ${isPlayer ? 'sent' : 'received'} ${s.isStaged ? 'staged' : ''}`;
+    
+    const messageActionsHtml = `<div class="message-actions" data-message-uid="${s.uid}" title="更多操作"><i class="fas fa-ellipsis-h"></i></div>`;
+    const avatarHtml = `<div class="avatar-container"><img src="${senderAvatar}" class="avatar clickable-avatar" data-contact-id="${s.sender_id}"></div>`;
+    const statusHtml = isPlayer && s.isStaged ? `<div class="message-status"><i class="fas fa-clock" title="发送中"></i></div>` : '';
+    const senderNameHtml = isGroup && !isPlayer ? `<div class="sender-name">${senderName}</div>` : '';
+
+    const bubbleContent = `<div class="message-content">${contentHtml}</div>`;
+
+    if (isPlayer) {
+        return `<div class="${messageClass}" data-uid="${s.uid}">
+                    <div class="message-wrapper-with-actions">
+                        <div class="message-wrapper">${bubbleContent}</div>
+                        ${messageActionsHtml}${statusHtml}
+                    </div>
+                    ${avatarHtml}
+                </div>`;
+    } else {
+        return `<div class="${messageClass}" data-uid="${s.uid}">
+                    ${avatarHtml}
+                    <div class="message-wrapper-with-actions">
+                        <div class="message-wrapper">${senderNameHtml}${bubbleContent}</div>
+                        ${messageActionsHtml}
+                    </div>
+                </div>`;
+    }
+}
+
 
 export function showTransactionModal(message) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);

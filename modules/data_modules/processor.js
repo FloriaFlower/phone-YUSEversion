@@ -146,13 +146,16 @@ async function _handleLiveCenterCommands(commands, msgId) {
      });
 }
 
-async function _handleMomentCommands(momentCommands, msgId) {
+async function _handleMomentAndMomentUpdateCommands(momentCommands, momentUpdateCommands, msgId) {
     await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        // 1. Clean up old data from this message ID to ensure idempotency
         for (const contactId in dbData) {
             if (dbData[contactId].moments) {
                 dbData[contactId].moments = dbData[contactId].moments.filter(m => String(m.sourceMsgId) !== String(msgId));
             }
         }
+
+        // 2. Process new moments first and add them to the database
         momentCommands.forEach(cmd => {
             let posterContact = dbData[cmd.posterId];
             if (!posterContact) {
@@ -174,22 +177,16 @@ async function _handleMomentCommands(momentCommands, msgId) {
             }
             
             posterContact.moments.push(newMoment);
-            posterContact.moments.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
         });
-        return dbData;
-    });
-}
 
-async function _handleMomentUpdateCommands(commands) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        commands.forEach(cmd => {
+        // 3. Process moment updates against the now-updated database
+        momentUpdateCommands.forEach(cmd => {
             let momentFound = false;
             for (const contactId in dbData) {
                 const contact = dbData[contactId];
                 if (contact.moments) {
-                    const momentIndex = contact.moments.findIndex(m => m.momentId === cmd.动态id);
-                    if (momentIndex > -1) {
-                        const momentToUpdate = contact.moments[momentIndex];
+                    const momentToUpdate = contact.moments.find(m => m.momentId === cmd.动态id);
+                    if (momentToUpdate) {
                         if (cmd.action === 'like') {
                             if (!momentToUpdate.likes) momentToUpdate.likes = [];
                             if (!momentToUpdate.likes.includes(cmd.actor_id)) {
@@ -204,14 +201,22 @@ async function _handleMomentUpdateCommands(commands) {
                             });
                         }
                         momentFound = true;
-                        break;
+                        break; 
                     }
                 }
             }
-            if (!momentFound) {
-                console.warn(`[Phone Sim] Moment with ID ${cmd.动态id} not found for update.`);
+             if (!momentFound) {
+                console.warn(`[Phone Sim] Moment with ID ${cmd.动态id} not found for update. It might have been created in the same message batch.`);
             }
         });
+        
+        // 4. Sort all moments collections
+        for (const contactId in dbData) {
+            if (dbData[contactId].moments) {
+                dbData[contactId].moments.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            }
+        }
+
         return dbData;
     });
 }
@@ -452,8 +457,8 @@ export async function mainProcessor(msgId) {
         await _handleLiveCenterCommands(liveCenterCommands, msgId);
         liveCenterUpdated = true;
     }
-    if (momentUpdateCommands.length > 0) {
-        await _handleMomentUpdateCommands(momentUpdateCommands);
+    if (momentCommands.length > 0 || momentUpdateCommands.length > 0) {
+        await _handleMomentAndMomentUpdateCommands(momentCommands, momentUpdateCommands, msgId);
         momentsUpdated = true;
     }
     if (voiceCallCommands.length > 0) {
@@ -467,10 +472,6 @@ export async function mainProcessor(msgId) {
             if (PhoneSim_State.isPhoneCallActive) UI.updatePhoneCall(cmd);
             else UI.showPhoneCall(cmd);
         });
-    }
-    if (momentCommands.length > 0) {
-        await _handleMomentCommands(momentCommands, msgId);
-        momentsUpdated = true;
     }
 
     // A full data fetch is only needed if persistent data was changed.

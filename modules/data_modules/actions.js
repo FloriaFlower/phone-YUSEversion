@@ -130,7 +130,7 @@ export function stagePlayerMessage(contactId, messageContent, replyingToUid = nu
 
 export function stagePlayerAction(action) {
     PhoneSim_State.stagedPlayerActions.push(action);
-    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true, chatUpdated: true });
+    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true, liveCenterUpdated: true, chatUpdated: true });
     UI.updateCommitButton();
 }
 
@@ -202,7 +202,6 @@ export async function commitStagedActions() {
         });
 
         playerActionsToCommit.forEach(action => {
-            // ... (existing player action prompt generation logic)
             const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
             const poster = moment ? PhoneSim_State.contacts[moment.posterId] : null;
             const posterName = poster?.profile.note || poster?.profile.nickname || moment?.posterId;
@@ -259,10 +258,10 @@ export async function commitStagedActions() {
                     textPrompt += `- ${responseText}${action.from_name}的好友请求\\n`;
                     break;
                 case 'new_forum_post':
-                    const board = PhoneSim_State.forumData[action.boardId];
-                    if (board) {
-                        textPrompt += `- 在论坛“${board.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
-                    }
+                    textPrompt += `- 在论坛“${action.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
+                    break;
+                case 'new_live_stream':
+                    textPrompt += `- 在直播中心“${action.boardName}”板块创建了新的直播间，标题为“${action.title}”，直播简介为“${action.content}”\\n`;
                     break;
                 case 'new_forum_reply':
                     const post = DataHandler.findForumPostById(action.postId);

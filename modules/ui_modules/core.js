@@ -177,6 +177,7 @@ export function showView(viewId, ...args) {
         case 'ForumPostDetail': PhoneSim_State.activeForumPostId = activeId; break;
         case 'LiveStreamList': PhoneSim_State.activeLiveBoardId = activeId; break;
         case 'LiveStreamRoom': PhoneSim_State.activeLiveStreamId = activeId; break;
+        case 'Creation': PhoneSim_State.creationContext = options.context; PhoneSim_State.previousView = PhoneSim_State.currentView; break;
     }
 
 
@@ -273,5 +274,13 @@ export function renderViewContent(viewId, ...args) {
         case 'LiveCenterApp': UI.renderLiveBoardList(); break;
         case 'LiveStreamList': UI.renderLiveStreamList(args[0]); break;
         case 'LiveStreamRoom': UI.renderLiveStreamRoom(args[0]); break;
+        case 'Creation': UI.renderCreationView(PhoneSim_State.creationContext); break;
     }
+}
+
+export function renderCreationView(context) {
+    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const title = context === 'forum' ? '创建新帖子' : '创建新直播';
+    p.find('#creation-view-title').text(title);
+    p.find('#creation-form')[0].reset();
 }

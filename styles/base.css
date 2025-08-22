@@ -124,7 +124,7 @@
     box-sizing: border-box;
 }
 #phone-sim-panel-v10-0 .app-header h3{flex-grow:1;text-align:center;margin:0;padding-left:30px;padding-right:30px; font-size: 16px;}
-#phone-sim-panel-v10-0 .app-header .header-actions{cursor:pointer;z-index:10;}
+#phone-sim-panel-v10-0 .app-header .header-actions{cursor:pointer;z-index:10; position: absolute; right: 16px;}
 #phone-sim-panel-v10-0 .moments-header-actions-wrapper { position: absolute; right: 16px; display:flex; gap: 16px; z-index: 10; }
 
 #phone-sim-panel-v10-0 .app-back-btn {
@@ -195,4 +195,47 @@
 
 .app-block:active, .send-btn:active, .emoji-btn:active, .dial-key:active, .control-button:active, .call-button:active, .modal-btn:active, .dialog-btn:active, .moment-actions .action-btn:active, .friend-request-btn:active, .phone-contact-call-btn:active, .dial-call-btn:active, #browser-go-btn:active, #clear-history-btn:active, .forum-reply-send-btn:active, .nav-item:active {
     transform: scale(0.92);
+}
+
+/* Creation View Styles */
+#phone-sim-panel-v10-0 #creation-view {
+    background-color: #f0f2f5;
+}
+#phone-sim-panel-v10-0 #creation-form {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    overflow-y: auto;
+}
+#phone-sim-panel-v10-0 .creation-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#phone-sim-panel-v10-0 .creation-form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+}
+#phone-sim-panel-v10-0 .creation-form-group input,
+#phone-sim-panel-v10-0 .creation-form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+#phone-sim-panel-v10-0 #creation-submit-btn {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #007aff;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
 }

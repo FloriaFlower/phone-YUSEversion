@@ -55,12 +55,16 @@ export function renderHomepage(contactId) {
     }
 
     moments.forEach(moment => {
-         const contentHtml = UI._renderRichMessage(moment, true);
+         const contentHtml = UI.renderRichContent(moment.content, { isMoment: true });
          const imagesHtml = (moment.images || []).map(img => `<img src="${img.startsWith('http') ? img : 'https://files.catbox.moe/'+img}" class="moment-image">`).join('');
          const likes = [...(moment.likes || [])];
          const comments = [...(moment.comments || [])];
          const likesHtml = likes.length > 0 ? `<div class="moment-likes"><i class="fas fa-heart"></i> ${likes.map(id => UI._getContactName(id)).join(', ')}</div>` : '';
-         const commentsHtml = comments.map(c => `<div class="moment-comment"><b>${UI._getContactName(c.commenterId)}:</b> ${jQuery_API('<div>').text(c.text).html()}</div>`).join('');
+         const commentsHtml = comments.map(c => {
+             const commenterName = UI._getContactName(c.commenterId);
+             const commentContent = UI.renderRichContent(c.text, { isMoment: true });
+             return `<div class="moment-comment"><b>${commenterName}:</b> ${commentContent}</div>`;
+         }).join('');
 
         const post = jQuery_API(`
             <div class="moment-post" data-moment-id="${moment.momentId}">
@@ -118,15 +122,22 @@ export function renderMomentsView() {
             }
         });
 
-        const contentHtml = UI._renderRichMessage(moment, true);
+        const contentHtml = UI.renderRichContent(moment.content, { isMoment: true });
         const imagesHtml = (moment.images || []).map(img => `<img src="${img.startsWith('http') ? img : 'https://files.catbox.moe/'+img}" class="moment-image">`).join('');
         const likesHtml = likes.length > 0 ? `<div class="moment-likes"><i class="fas fa-heart"></i> ${likes.map(id => UI._getContactName(id)).join(', ')}</div>` : '';
+        
         const commentsHtml = comments.map(c => {
             const commenterName = UI._getContactName(c.commenterId);
             const isPlayerComment = c.commenterId === PhoneSim_Config.PLAYER_ID;
-            let content = c.recalled ? c.text : jQuery_API('<div>').text(c.text).html();
+            let content;
+            if (c.recalled) {
+                content = jQuery_API('<div>').text(c.text).html();
+            } else {
+                content = UI.renderRichContent(c.text, { isMoment: true });
+            }
             return `<div class="moment-comment ${c.isStaged ? 'staged' : ''} ${isPlayerComment ? 'player-comment' : ''}" data-comment-id="${c.uid}"><b>${commenterName}:</b> ${content}</div>`;
         }).join('');
+
         const momentActionsHtml = `<div class="moment-actions-trigger" data-moment-id="${moment.momentId}" data-poster-id="${moment.posterId}"><i class="fas fa-ellipsis-h"></i></div>`;
 
         const post = jQuery_API(`

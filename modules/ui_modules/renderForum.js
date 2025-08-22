@@ -96,7 +96,7 @@ export async function renderForumPostList(boardId) {
     const posts = boardData?.posts || [];
     
     const stagedPosts = PhoneSim_State.stagedPlayerActions
-        .filter(a => a.type === 'new_forum_post' && a.boardId === boardId)
+        .filter(a => a.type === 'new_forum_post' && a.boardName === boardName)
         .map(a => ({
             postId: a.postId,
             authorId: PhoneSim_Config.PLAYER_ID,
