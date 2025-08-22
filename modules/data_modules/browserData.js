@@ -1,41 +1,16 @@
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
-let TavernHelper_API;
+let SillyTavern_API, TavernHelper_API;
 let UI, DataHandler;
 
 export function init(deps, uiHandler, dataHandler) {
+    SillyTavern_API = deps.st;
     TavernHelper_API = deps.th;
     UI = uiHandler;
     DataHandler = dataHandler;
 }
 
-async function addHistoryEntry(url, title) {
-    await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, browserDb => {
-        if (!browserDb.history) browserDb.history = [];
-        if (!browserDb.pages) browserDb.pages = {};
-
-        // If the page doesn't have a full entry yet (e.g., from a bookmark click), create a minimal one.
-        if (!browserDb.pages[url]) {
-             browserDb.pages[url] = {
-                url, title, type: 'page', content: [],
-                timestamp: new Date().toISOString(), sourceMsgId: 'manual_nav'
-            };
-        }
-        
-        // Truncate "forward" history
-        if (PhoneSim_State.browserHistoryIndex < browserDb.history.length - 1) {
-            browserDb.history = browserDb.history.slice(0, PhoneSim_State.browserHistoryIndex + 1);
-        }
-
-        // Add to history
-        if (browserDb.history[browserDb.history.length - 1] !== url) {
-            browserDb.history.push(url);
-        }
-
-        return browserDb;
-    });
-}
 
 export function isBookmarked(url) {
     return PhoneSim_State.browserBookmarks.some(bookmark => bookmark.url === url);
@@ -62,12 +37,9 @@ export async function deleteHistoryItem(url) {
         if (browserDb.history) {
             browserDb.history = browserDb.history.filter(hUrl => hUrl !== url);
         }
-        // Also remove the page content associated with it if it's just a placeholder
-        if (browserDb.pages && browserDb.pages[url] && browserDb.pages[url].sourceMsgId === 'manual_nav') {
-             delete browserDb.pages[url];
-        }
         return browserDb;
     });
+    await DataHandler.fetchAllBrowserData();
 }
 
 export async function deleteBookmarkItem(url) {
@@ -77,33 +49,57 @@ export async function deleteBookmarkItem(url) {
         }
         return browserDb;
     });
+    await DataHandler.fetchAllBrowserData();
 }
 
-
-export async function navigateTo(entry) {
+async function _navigateTo(prompt, action) {
+    PhoneSim_State.pendingBrowserAction = action;
     UI.setLoading(true);
-    if (typeof entry === 'string') { // Search term
-        PhoneSim_State.pendingBrowserAction = { type: 'search', value: entry };
-        TavernHelper_API.triggerSlash(`/send (系统提示：{{user}}在浏览器中搜索：“${entry}”)`);
-    } else if (typeof entry === 'object' && entry.url) { // URL object from a search result, history or bookmark
-        if (!PhoneSim_State.browserData[entry.url] || !PhoneSim_State.browserData[entry.url].content || PhoneSim_State.browserData[entry.url].content.length === 0) {
-            // Page content doesn't exist, request it from AI
-            PhoneSim_State.pendingBrowserAction = { type: 'pageload', url: entry.url, title: entry.title };
-            TavernHelper_API.triggerSlash(`/send (系统提示：{{user}}点击了标题为“${entry.title}”的链接，请为我生成对应的网页内容。)`);
-        } else {
-            // Page exists, just add history entry and render from state
-            await addHistoryEntry(entry.url, entry.title);
-            await DataHandler.fetchAllBrowserData(); // Resync state
-            PhoneSim_State.browserHistoryIndex = PhoneSim_State.browserHistory.length - 1;
-            UI.renderBrowserState();
-            UI.setLoading(false);
-        }
+    if (prompt) {
+        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+        SillyTavern_API.generate();
     }
 }
 
+
+export async function browserSearch(term) {
+    PhoneSim_State.browserHistory = [];
+    PhoneSim_State.browserHistoryIndex = -1;
+    const action = { type: 'search', value: term };
+    const prompt = `(系统提示：{{user}}在浏览器中搜索：“${term}”)`;
+    await _navigateTo(prompt, action);
+}
+
+export async function browserLoadPage(url, title) {
+    const pageExists = PhoneSim_State.browserData[url] && PhoneSim_State.browserData[url].content?.length > 0;
+
+    if (PhoneSim_State.browserHistoryIndex < PhoneSim_State.browserHistory.length - 1) {
+        PhoneSim_State.browserHistory = PhoneSim_State.browserHistory.slice(0, PhoneSim_State.browserHistoryIndex + 1);
+    }
+    if (PhoneSim_State.browserHistory[PhoneSim_State.browserHistory.length - 1] !== url) {
+        PhoneSim_State.browserHistory.push(url);
+    }
+    PhoneSim_State.browserHistoryIndex = PhoneSim_State.browserHistory.length - 1;
+
+    if (pageExists) {
+        await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, db => {
+            if (!db.history) db.history = [];
+            if (db.history[db.history.length - 1] !== url) db.history.push(url);
+            return db;
+        });
+        await DataHandler.fetchAllBrowserData();
+        UI.renderBrowserState();
+        UI.setLoading(false);
+    } else {
+        const action = { type: 'pageload', url: url, title: title };
+        const prompt = `(系统提示：{{user}}点击了标题为“${title}”的链接，请为我生成对应的网页内容。)`;
+        await _navigateTo(prompt, action);
+    }
+}
+
+
 export async function saveSearchResults(searchTerm, results, msgId) {
     await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, browserDb => {
-        // Save the search result list to the directory
         browserDb.directory = {
             title: `搜索: ${searchTerm}`,
             content: results,
@@ -111,29 +107,21 @@ export async function saveSearchResults(searchTerm, results, msgId) {
             sourceMsgId: msgId
         };
         
-        // Also create stubs for each page in the pages database if they don't exist
-        if (!browserDb.pages) {
-            browserDb.pages = {};
-        }
+        if (!browserDb.pages) browserDb.pages = {};
         results.forEach(result => {
-            // Only create a stub if the page doesn't exist at all. Don't overwrite existing pages.
             if (!browserDb.pages[result.url]) {
                 browserDb.pages[result.url] = {
                     url: result.url,
                     title: result.title,
-                    type: 'page', // Consistent type
-                    content: [], // Empty content signifies it needs to be fetched
+                    type: 'page',
+                    content: [], 
                     timestamp: new Date().toISOString(),
-                    sourceMsgId: msgId // Associate with the search result generation
+                    sourceMsgId: msgId
                 };
             }
         });
-
         return browserDb;
     });
-    await DataHandler.fetchAllBrowserData();
-    UI.renderBrowserState();
-    UI.setLoading(false);
 }
 
 export async function savePageContent(pageData, msgId) {
@@ -141,64 +129,52 @@ export async function savePageContent(pageData, msgId) {
     
     await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, browserDb => {
         if (!browserDb.pages) browserDb.pages = {};
-        if (!browserDb.history) browserDb.history = [];
-        
-        // Save page content
         browserDb.pages[url] = {
             url, title, type: 'page', content,
             timestamp: new Date().toISOString(), sourceMsgId: msgId
         };
         
-        // Truncate forward history if navigating from a back-state
-        if (PhoneSim_State.browserHistoryIndex < browserDb.history.length - 1) {
-            browserDb.history = browserDb.history.slice(0, PhoneSim_State.browserHistoryIndex + 1);
-        }
-
-        // Add to history if it's a new navigation
+        if (!browserDb.history) browserDb.history = [];
         if (browserDb.history[browserDb.history.length - 1] !== url) {
             browserDb.history.push(url);
         }
         
         return browserDb;
     });
-
-    await DataHandler.fetchAllBrowserData();
-    PhoneSim_State.browserHistoryIndex = PhoneSim_State.browserHistory.length - 1;
-    UI.renderBrowserState();
-    UI.setLoading(false);
 }
 
-
-export function goBack() {
+export function browserGoBack() {
     if (PhoneSim_State.browserHistoryIndex > 0) {
         PhoneSim_State.browserHistoryIndex--;
         UI.renderBrowserState();
+    } else {
+        UI.showView('HomeScreen');
     }
 }
 
-export function goForward() {
-    if (PhoneSim_State.browserHistoryIndex < PhoneSim_State.browserHistory.length - 1) {
-        PhoneSim_State.browserHistoryIndex++;
-        UI.renderBrowserState();
-    }
+export function browserGoToHomePage() {
+    PhoneSim_State.browserHistory = [];
+    PhoneSim_State.browserHistoryIndex = -1;
+    PhoneSim_State.browserDirectory = {}; 
+    UI.renderBrowserState();
 }
 
-export async function refresh() {
+export async function browserRefresh() {
     if (PhoneSim_State.browserHistoryIndex > -1) {
        const currentUrl = PhoneSim_State.browserHistory[PhoneSim_State.browserHistoryIndex];
        const currentData = PhoneSim_State.browserData[currentUrl];
        if (!currentData) return;
-        await navigateTo({ url: currentData.url, title: currentData.title });
+        await browserLoadPage(currentData.url, currentData.title);
     }
 }
 
-export async function clearHistory() {
+export async function clearPersistentHistory() {
      await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, browserDb => {
         browserDb.history = [];
-        // Optionally, also clear pages that are not bookmarked? For now, just history.
         return browserDb;
      });
      await DataHandler.fetchAllBrowserData();
+     PhoneSim_State.browserHistory = [];
      PhoneSim_State.browserHistoryIndex = -1;
      UI.renderBrowserState();
 }

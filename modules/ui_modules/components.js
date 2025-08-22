@@ -11,6 +11,20 @@ export function init(deps, dataHandler, uiObject) {
     DataHandler = dataHandler;
 }
 
+export function getPostListSkeleton() {
+    return `
+    <div class="skeleton-forum-post-list">
+        ${'<div class="skeleton-forum-post-item"><div class="skeleton title"></div><div class="skeleton text"></div><div class="skeleton text short"></div><div class="skeleton meta"></div></div>'.repeat(5)}
+    </div>`;
+}
+
+export function getStreamListSkeleton() {
+    return `
+    <div class="skeleton-stream-list">
+        ${'<div class="skeleton-stream-item"><div class="skeleton thumbnail"></div><div class="skeleton-stream-info"><div class="skeleton title"></div><div class="skeleton meta"></div></div></div>'.repeat(6)}
+    </div>`;
+}
+
 export function renderInteractiveMessage(message) {
     const { requestData, uid } = message;
     if (!requestData || requestData.type !== 'friend_request') {
@@ -23,7 +37,7 @@ export function renderInteractiveMessage(message) {
     if (status === 'pending') {
         actionsHtml = `
             <div class="friend-request-actions">
-                <button class="friend-request-btn decline" data-action="decline">忽略</button>
+                <button class="friend-request-btn decline" data-action="ignore">忽略</button>
                 <button class="friend-request-btn accept" data-action="accept">接受</button>
             </div>`;
     } else {
@@ -161,6 +175,8 @@ export function _renderRichMessage(message, isMoment = false) {
 
     if (typeof content === 'object' && content !== null) {
         switch(content.type) {
+            case 'local_image':
+                return `<img src="${content.base64}" class="inline-image" alt="本地图片预览">`;
             case 'voice': return `<div class="rich-message voice-message" data-text="${sanitize(content.text)}"><div class="voice-bar"><div class="voice-wave"><span></span><span></span><span></span><span></span></div><span class="voice-duration">${sanitize(content.duration)}</span></div><div class="voice-transcript">${sanitize(content.text)}</div></div>`;
             case 'transfer': case 'red_packet':
                 const isRedPacket = content.type === 'red_packet';
@@ -189,10 +205,12 @@ export function _renderRichMessage(message, isMoment = false) {
                             </div>
                             <div class="transfer-footer">${footerText}</div>
                         </div>`;
-            case 'location': return `<div class="rich-message location-message">
+            case 'location':
+                const locationText = sanitize(content.text);
+                return `<div class="rich-message location-message" data-location="${locationText}" title="点击查看详情">
                                     <div class="location-map"></div>
                                     <div class="location-text-content">
-                                        <div class="location-title">${sanitize(content.text)}</div>
+                                        <div class="location-title">${locationText}</div>
                                         <div class="location-subtitle">收到的地理位置</div>
                                     </div>
                                 </div>`;

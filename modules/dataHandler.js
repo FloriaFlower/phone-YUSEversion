@@ -4,8 +4,9 @@ import * as Actions from './data_modules/actions.js';
 import * as Fetch from './data_modules/fetch.js';
 import * as BrowserData from './data_modules/browserData.js';
 import * as ForumData from './data_modules/forumData.js';
+import * as LiveCenterData from './data_modules/liveCenterData.js';
 
-const modules = [Processor, Actions, Fetch, BrowserData, ForumData];
+const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData];
 
 // Aggregate all functions from sub-modules into this single object.
 export const PhoneSim_DataHandler = {};

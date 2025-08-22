@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../config.js';
 import { PhoneSim_State } from './state.js';
 
@@ -37,7 +36,12 @@ export const PhoneSim_Parser = {
                     const obj = { type: pat.type };
                     if (pat.type === 'image') {
                         const imageContent = individualMatch[1].trim();
-                        if (imageContent.startsWith('http') || /^[a-zA-Z0-9_-]+\.(?:jpeg|jpg|png|gif|webp)$/i.test(imageContent)) {
+                        const catboxRegex = /([a-z0-9]{6}\.(?:jpeg|jpg|png|gif|webp))/i;
+                        const catboxMatch = imageContent.match(catboxRegex);
+
+                        if (catboxMatch && catboxMatch[1]) {
+                            obj.url = 'https://files.catbox.moe/' + catboxMatch[1];
+                        } else if (imageContent.startsWith('http') || /^[a-zA-Z0-9_-]+\.(?:jpeg|jpg|png|gif|webp)$/i.test(imageContent)) {
                             obj.url = imageContent.startsWith('http') ? imageContent : 'https://files.catbox.moe/' + imageContent;
                         } else {
                             obj.type = 'pseudo_image';
@@ -92,23 +96,25 @@ export const PhoneSim_Parser = {
         if (!typeMatch) return null;
         const type = typeMatch[1].trim();
 
-        const isDataJsonCommand = (appName === '微信' && ['新动态', '更新资料', '更新动态'].includes(type)) || (appName === '论坛' && ['新帖子', '新回复'].includes(type));
+        const isDataJsonCommand = (appName === '微信' && ['新动态', '更新资料', '更新动态'].includes(type)) 
+                                || (appName === '论坛' && ['新帖子', '新回复'].includes(type))
+                                || (appName === '直播中心' && ['目录更新', '直播间状态'].includes(type));
         const isBrowserWebpage = (appName === '浏览器' && type === '网页');
 
         if (isDataJsonCommand) {
             const dataMatch = /data:\s*({.*})/s.exec(paramsStr);
             if (!dataMatch || !dataMatch[1]) {
-                console.error(`[Phone Sim] ERROR: '${type}' command requires 'data:{...}' JSON format. Instruction:`, r);
+                console.error(`[Phone Sim] ERROR: '${type}' command in app '${appName}' requires 'data:{...}' JSON format. Instruction:`, r);
                 return null;
             }
             try {
                 const jsonData = JSON.parse(dataMatch[1]);
                 if (appName === '论坛') {
-                    // Apply rich content parsing to forum post/reply content
-                    if (jsonData.content) {
-                        jsonData.content = this._parseContent(jsonData.content);
-                    }
+                    if (jsonData.content) jsonData.content = this._parseContent(jsonData.content);
                     return { commandType: 'Forum', app: '论坛', type: type, data: jsonData };
+                }
+                if (appName === '直播中心') {
+                    return { commandType: 'LiveCenter', app: '直播中心', type: type, data: jsonData };
                 }
                 if (type === '新动态') {
                     const commentsWithId = (jsonData.评论 || []).map(c => ({...c, uid: 'comment_' + Date.now() + Math.random()}));
@@ -163,7 +169,6 @@ export const PhoneSim_Parser = {
 
              try {
                  const content = JSON.parse(contentStr);
-                 // Apply rich content parsing to each block's text content
                  const processedContent = content.map(block => ({
                      ...block,
                      text: this._parseContent(block.text)
@@ -263,6 +268,11 @@ export const PhoneSim_Parser = {
                 }
             } else if (params.type === '好友请求') {
                 finalMessage.interactiveType = 'friend_request';
+                // BUG FIX: Add backward compatibility and fallbacks to prevent undefined names
+                if (params.id && !params.from_id) finalMessage.from_id = params.id;
+                if (params.name && !params.from_name) finalMessage.from_name = params.name;
+                if (!finalMessage.from_name) finalMessage.from_name = finalMessage.from_id;
+
             } else {
                 return null;
             }

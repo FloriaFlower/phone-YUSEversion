@@ -1,4 +1,5 @@
 
+
 import * as Core from './ui_modules/core.js';
 import * as Events from './ui_modules/events.js';
 import * as RenderChat from './ui_modules/renderChat.js';
@@ -8,10 +9,12 @@ import * as RenderPhoneEmail from './ui_modules/renderPhoneEmail.js';
 import * as RenderGroup from './ui_modules/renderGroup.js';
 import * as RenderBrowser from './ui_modules/renderBrowser.js';
 import * as RenderForum from './ui_modules/renderForum.js';
+import * as RenderLiveCenter from './ui_modules/renderLiveCenter.js';
+import * as RenderSettings from './ui_modules/renderSettings.js';
 import * as Components from './ui_modules/components.js';
 import * as Utils from './ui_modules/utils.js';
 
-const modules = [Core, Events, RenderChat, RenderMoments, RenderCall, RenderPhoneEmail, RenderGroup, RenderBrowser, RenderForum, Components, Utils];
+const modules = [Core, Events, RenderChat, RenderMoments, RenderCall, RenderPhoneEmail, RenderGroup, RenderBrowser, RenderForum, RenderLiveCenter, RenderSettings, Components, Utils];
 
 // Aggregate all functions from sub-modules into this single object.
 export const PhoneSim_UI = {};

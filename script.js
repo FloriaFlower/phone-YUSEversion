@@ -1,13 +1,10 @@
 
 
-
-
-
-
 import { PhoneSim_UI } from './modules/ui.js';
 import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
 import { PhoneSim_Sounds } from './modules/sounds.js';
+import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
@@ -16,7 +13,7 @@ const defaultSettings = {
     enabled: true,
 };
 
-const loggingPrefix = '[手机模拟器 v16.8]';
+const loggingPrefix = '[手机模拟器 v16.12]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
@@ -78,17 +75,20 @@ async function mainInitialize() {
     
     PhoneSim_State.init(parentWin);
     PhoneSim_State.loadUiState();
+    PhoneSim_State.loadCustomization(); // Load customization early
     PhoneSim_Sounds.init(PhoneSim_State);
 
     PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
     PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
     
+    // CRITICAL: Asynchronously create and inject the UI from the template.
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
         console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
         return;
     }
 
+    // Bind core event listeners now that the UI is guaranteed to exist.
     const e = SillyTavern_API.eventTypes;
     SillyTavern_API.eventSource.on(e.MESSAGE_EDITED, (id) => debouncedMainProcessor(id));
     SillyTavern_API.eventSource.on(e.MESSAGE_RECEIVED, (id) => debouncedMainProcessor(id));
@@ -113,7 +113,7 @@ function areCoreApisReady() {
         SillyTavern_API.eventSource && typeof SillyTavern_API.eventSource.on === 'function' &&
         SillyTavern_API.eventTypes &&
         typeof TavernHelper_API.getWorldbook === 'function' &&
-        typeof SillyTavern_API.renderExtensionTemplateAsync === 'function' &&
+        typeof jQuery_API.fn.append === 'function' && // Check for jQuery function instead of template renderer
         typeof SillyTavern_API.generate === 'function');
 }
 

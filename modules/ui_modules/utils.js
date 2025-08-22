@@ -1,13 +1,13 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
-let jQuery_API, parentWin, UI;
+let jQuery_API, parentWin, UI, DataHandler;
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
     UI = uiObject;
+    DataHandler = dataHandler;
 }
 
 export function throttle(func, limit) {
@@ -39,6 +39,63 @@ export function compressImage(base64Str, maxWidth = 800, maxHeight = 1200, quali
         img.onerror = (error) => reject("无法加载图片进行压缩。");
     });
 }
+
+export function handleFileUpload(uploadType, contactId = null) {
+    const fileInput = jQuery_API(parentWin.document.body).find('#phone-sim-file-input');
+    
+    // Define the generic callback that will be used by the file input's change event
+    const fileReaderCallback = (e) => {
+        const fullBase64 = e.target.result;
+        // The callback logic is now determined by `UI.fileUploadCallback` which is set below.
+        if (UI.fileUploadCallback) {
+            UI.fileUploadCallback(fullBase64);
+        }
+        // Clean up to prevent the same callback from firing for different upload types.
+        UI.fileUploadCallback = null;
+    };
+    
+    // Set the specific action for the current upload type
+    if (['playerAvatar', 'homescreenWallpaper', 'chatListWallpaper', 'chatViewWallpaper'].includes(uploadType)) {
+        UI.fileUploadCallback = async (base64data) => {
+            const compressedData = await UI.compressImage(base64data);
+            PhoneSim_State.customization[uploadType] = compressedData;
+            DataHandler.saveCustomization();
+            if (uploadType === 'playerAvatar') {
+                DataHandler.saveContactAvatar(PhoneSim_Config.PLAYER_ID, compressedData);
+            }
+        };
+    } else if (uploadType === 'contactAvatar' && contactId) {
+        UI.fileUploadCallback = async (base64data) => {
+            const compressedData = await UI.compressImage(base64data);
+            DataHandler.saveContactAvatar(contactId, compressedData);
+        };
+    } else if (uploadType === 'localImageUpload') {
+        UI.fileUploadCallback = (base64data) => { // Don't compress for AI
+            if (contactId) {
+                DataHandler.stagePlayerMessage(
+                    contactId, 
+                    { type: 'local_image', base64: base64data }, 
+                    null, 
+                    '[本地图片]'
+                );
+            }
+        };
+    }
+
+    // Attach the file reader logic to the input's change event
+    fileInput.off('change.phonesim-upload').one('change.phonesim-upload', (event) => {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = fileReaderCallback;
+            reader.readAsDataURL(file);
+        }
+        fileInput.val(''); // Reset the input
+    });
+
+    fileInput.click();
+}
+
 
 export function updateTime() {
     jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID} .status-time`).text(PhoneSim_State.worldTime);
@@ -92,6 +149,7 @@ export function populateApps() {
     const gridApps = [
         { v: 'BrowserApp', n: '浏览器', i: 'fa-globe', prefix: 'fas' },
         { v: 'ForumApp', n: '论坛', i: 'fa-comments', prefix: 'fas' },
+        { v: 'LiveCenterApp', n: '直播中心', i: 'fa-broadcast-tower', prefix: 'fas' },
     ];
 
     const dockApps = [
@@ -125,7 +183,7 @@ export function applyCustomizations() {
     pHead.find('[id^=phone-sim-wallpaper-style]').remove();
     if (customization.homescreenWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-home">#${PhoneSim_Config.PANEL_ID} #homescreen-view { background-image: url(${customization.homescreenWallpaper}) !important; }</style>`);
     if (customization.chatListWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-list">#${PhoneSim_Config.PANEL_ID} .chat-list-subview { background-image: url(${customization.chatListWallpaper}) !important; }</style>`);
-    if (customization.chatViewWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-chat">#${PhoneSim_Config.PANEL_ID} .chat-view-subview { background-image: url(${customization.chatViewWallpaper}) !important; }</style>`);
+    if (customization.chatViewWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-chat">#${PhoneSim_Config.PANEL_ID} #chatconversation-view { background-image: url(${customization.chatViewWallpaper}) !important; }</style>`);
     
     const muteSwitch = jQuery_API(parentWin.document.body).find('#mute-switch');
     if(customization.isMuted) muteSwitch.addClass('active'); else muteSwitch.removeClass('active');

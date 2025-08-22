@@ -81,6 +81,7 @@ async function _handleForumCommands(commands, msgId) {
                     timestamp: PhoneSim_Parser.buildTimestamp(data.time),
                     tags: data.tags || [],
                     replies: [],
+                    likes: [],
                     sourceMsgId: msgId
                 };
                 forumDb[boardId].posts.push(newPost);
@@ -105,10 +106,44 @@ async function _handleForumCommands(commands, msgId) {
                     }
                 }
                 if (!postFound) console.warn(`[Phone Sim] Forum post with ID ${postId} not found for reply.`);
+            } else if (cmd.type === '更新帖子') {
+                const { postId, action, actorId } = data;
+                const post = Object.values(forumDb).flatMap(b => b.posts).find(p => p.postId === postId);
+                if (post) {
+                    if (action === 'like') {
+                        if (!post.likes) post.likes = [];
+                        if (!post.likes.includes(actorId)) {
+                            post.likes.push(actorId);
+                        }
+                    }
+                } else {
+                    console.warn(`[Phone Sim] Forum post with ID ${postId} not found for update.`);
+                }
             }
         });
         return forumDb;
     });
+}
+
+async function _handleLiveCenterCommands(commands, msgId) {
+     await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, liveDb => {
+        commands.forEach(cmd => {
+            const data = cmd.data;
+            if (cmd.type === '目录更新') {
+                const boardId = data.boardId;
+                if (!liveDb[boardId]) {
+                    liveDb[boardId] = { streams: [] };
+                }
+                // Replace the entire stream list for that board
+                liveDb[boardId].streams = data.streams;
+                liveDb[boardId].sourceMsgId = msgId;
+            } else if (cmd.type === '直播间状态') {
+                // Store the live stream state in a dedicated key, overwriting the previous one.
+                liveDb.active_stream = { ...data, sourceMsgId: msgId };
+            }
+        });
+        return liveDb;
+     });
 }
 
 async function _handleMomentCommands(momentCommands, msgId) {
@@ -234,6 +269,9 @@ async function _handleChatCommands(chatCommands, msgId) {
                     dbData[contactId] = { profile: { groupName: p.groupName, members: [] }, app_data: { WeChat: { messages: [] } } };
                     if (!dirData.groups) dirData.groups = {};
                     dirData.groups[p.groupName] = { id: p.groupId, members: [] };
+                } else if (p.type === '系统提示' && contactId) {
+                    // Create a placeholder contact. It will be populated by a subsequent message.
+                    dbData[contactId] = { profile: { nickname: contactId, note: '' }, app_data: { WeChat: { messages: [] } } };
                 }
             }
             
@@ -241,6 +279,7 @@ async function _handleChatCommands(chatCommands, msgId) {
             if (!contactObject) return;
             if (!isNew && p.type === '私聊' && p.profile && !dbData[contactId].profile.note) {
                  dbData[contactId].profile.note = p.profile.note;
+                 dbData[contactId].profile.nickname = p.profile.nickname;
             }
             if (!isNew && p.type === '群聊') {
                 contactObject.profile.groupName = p.groupName;
@@ -362,8 +401,9 @@ export async function mainProcessor(msgId) {
     const forumCommands = commands.filter(cmd => cmd.commandType === 'Forum');
     const browserSearchResultCommands = commands.filter(cmd => cmd.app === '浏览器' && cmd.type === '搜索目录');
     const browserWebpageCommand = commands.find(cmd => cmd.app === '浏览器' && cmd.type === '网页');
+    const liveCenterCommands = commands.filter(cmd => cmd.commandType === 'LiveCenter');
 
-    let chatUpdated = false, emailUpdated = false, momentsUpdated = false, profileUpdated = false, browserUpdated = false, forumUpdated = false;
+    let chatUpdated = false, emailUpdated = false, momentsUpdated = false, profileUpdated = false, browserUpdated = false, forumUpdated = false, liveCenterUpdated = false;
 
     for (const cmd of appCommands) {
         if (cmd.app === 'Email' && cmd.type === 'New') {
@@ -408,6 +448,10 @@ export async function mainProcessor(msgId) {
         await _handleForumCommands(forumCommands, msgId);
         forumUpdated = true;
     }
+    if (liveCenterCommands.length > 0) {
+        await _handleLiveCenterCommands(liveCenterCommands, msgId);
+        liveCenterUpdated = true;
+    }
     if (momentUpdateCommands.length > 0) {
         await _handleMomentUpdateCommands(momentUpdateCommands);
         momentsUpdated = true;
@@ -429,14 +473,15 @@ export async function mainProcessor(msgId) {
         momentsUpdated = true;
     }
 
-    if (chatUpdated || emailUpdated || momentsUpdated || profileUpdated || browserUpdated || forumUpdated) {
+    // A full data fetch is only needed if persistent data was changed.
+    if (chatUpdated || emailUpdated || momentsUpdated || profileUpdated || browserUpdated || forumUpdated || liveCenterUpdated) {
         await fetchAllData();
     }
-
+    
     UI.updateGlobalUnreadCounts();
 
     if (PhoneSim_State.isPanelVisible) {
-        UI.rerenderCurrentView({ chatUpdated, emailUpdated, momentsUpdated, profileUpdated, browserUpdated, forumUpdated });
+        UI.rerenderCurrentView({ chatUpdated, emailUpdated, momentsUpdated, profileUpdated, browserUpdated, forumUpdated, liveCenterUpdated });
     }
 }
 
@@ -508,11 +553,25 @@ export async function deleteMessagesBySourceId(sourceMsgId) {
         }
         return forumDb;
     });
+    
+    await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, liveDb => {
+        const id = String(sourceMsgId);
+        for (const boardId in liveDb) {
+            if(String(liveDb[boardId].sourceMsgId) === id) {
+                delete liveDb[boardId];
+            }
+        }
+        // Also clear active_stream if it's from the deleted message
+        if (liveDb.active_stream && String(liveDb.active_stream.sourceMsgId) === id) {
+            delete liveDb.active_stream;
+        }
+        return liveDb;
+    });
 
     await fetchAllData();
 
     if (PhoneSim_State.isPanelVisible) {
-        UI.rerenderCurrentView({ chatUpdated: true, emailUpdated: true, momentsUpdated: true, browserUpdated: true, forumUpdated: true });
+        UI.rerenderCurrentView({ chatUpdated: true, emailUpdated: true, momentsUpdated: true, browserUpdated: true, forumUpdated: true, liveCenterUpdated: true });
         UI.updateGlobalUnreadCounts();
     }
 }

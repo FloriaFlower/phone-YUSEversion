@@ -35,7 +35,7 @@ async function fetchAllDirectoryAndRequests() {
 export async function fetchAllBrowserData() {
     const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
     if (!lorebookName) {
-        PhoneSim_State.browserHistory = [];
+        PhoneSim_State.persistentBrowserHistory = [];
         PhoneSim_State.browserData = {};
         PhoneSim_State.browserBookmarks = [];
         PhoneSim_State.browserDirectory = {};
@@ -47,18 +47,14 @@ export async function fetchAllBrowserData() {
         
         const browserDb = browserDbEntry ? JSON.parse(browserDbEntry.content || '{}') : {};
         
-        PhoneSim_State.browserHistory = browserDb.history || [];
+        PhoneSim_State.persistentBrowserHistory = browserDb.history || []; // For the library view
         PhoneSim_State.browserData = browserDb.pages || {};
         PhoneSim_State.browserBookmarks = browserDb.bookmarks || [];
         PhoneSim_State.browserDirectory = browserDb.directory || {};
 
-        if (PhoneSim_State.browserHistory.length > 0 && PhoneSim_State.browserHistoryIndex === -1) {
-            PhoneSim_State.browserHistoryIndex = PhoneSim_State.browserHistory.length - 1;
-        }
-
     } catch (er) {
         console.error('[Phone Sim] Failed to fetch browser data:', er);
-        PhoneSim_State.browserHistory = [];
+        PhoneSim_State.persistentBrowserHistory = [];
         PhoneSim_State.browserData = {};
         PhoneSim_State.browserBookmarks = [];
         PhoneSim_State.browserDirectory = {};
@@ -78,6 +74,19 @@ export async function fetchAllForumData() {
     }
 }
 
+export async function fetchAllLiveCenterData() {
+    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    if (!lorebookName) { PhoneSim_State.liveCenterData = {}; return; }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const liveCenterEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_LIVECENTER_DATABASE);
+        PhoneSim_State.liveCenterData = liveCenterEntry ? JSON.parse(liveCenterEntry.content || '{}') : {};
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch live center data:', er);
+        PhoneSim_State.liveCenterData = {};
+    }
+}
+
 export async function fetchAllData() {
     await fetchAllContacts();
     await fetchAllEmails();
@@ -85,6 +94,7 @@ export async function fetchAllData() {
     await fetchAllCallLogs();
     await fetchAllBrowserData();
     await fetchAllForumData();
+    await fetchAllLiveCenterData();
     await fetchAllDirectoryAndRequests();
     UI.updateGlobalUnreadCounts();
 }
@@ -132,7 +142,6 @@ export async function fetchAllContacts() {
     const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
     if (!lorebookName) {
         PhoneSim_State.contacts = {};
-        PhoneSim_State.customization = { isMuted: false, playerNickname: '我' };
         return;
     }
     try {
@@ -143,10 +152,8 @@ export async function fetchAllContacts() {
         const dbData = dbEntry ? JSON.parse(dbEntry.content || '{}') : {};
         const avatarData = avatarEntry ? JSON.parse(avatarEntry.content || '{}') : {};
 
-        const savedCustomization = JSON.parse(parentWin.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION) || '{}');
-        const defaultCustomization = { isMuted: false, playerNickname: '我' };
-        PhoneSim_State.customization = { ...defaultCustomization, ...PhoneSim_State.customization, ...savedCustomization };
-
+        // BUG FIX: Removed redundant and faulty customization loading from this function.
+        // It is now handled centrally at startup in state.js to prevent data overwrites.
         if (avatarData[PhoneSim_Config.PLAYER_ID]) {
             PhoneSim_State.customization.playerAvatar = avatarData[PhoneSim_Config.PLAYER_ID];
         }
@@ -162,6 +169,5 @@ export async function fetchAllContacts() {
     } catch (er) {
         console.error('[Phone Sim] Failed to fetch all contacts:', er);
         PhoneSim_State.contacts = {};
-        PhoneSim_State.customization = { isMuted: false, playerNickname: '我' };
     }
 }

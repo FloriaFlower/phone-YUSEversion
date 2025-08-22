@@ -1,6 +1,7 @@
 
+
 /* Phone & Email Common */
-#phone-sim-panel-v10-0 #phoneapp-view .subview-wrapper { flex: 1; position: relative; overflow: hidden; }
+#phone-sim-panel-v10-0 #phoneapp-view .subview-wrapper { flex: 1; display: flex; position: relative; overflow: hidden; }
 #phone-sim-panel-v10-0 .phone-contact-list, #phone-sim-panel-v10-0 .email-list-content, #phone-sim-panel-v10-0 .call-log-list { flex:1; overflow-y:auto; background:#fff; }
 #phone-sim-panel-v10-0 .email-empty-state { text-align: center; margin-top: 40px; color: #999; }
 #phone-sim-panel-v10-0 .phoneapp-bottom-nav { height: 50px; flex-shrink: 0; display: flex; border-top: 1px solid #e0e0e0; background: #f7f7f7; }
@@ -14,7 +15,7 @@
 #phone-sim-panel-v10-0 #phoneapp-view .phone-dialer-subview,
 #phone-sim-panel-v10-0 #phoneapp-view .phone-log-subview {
     flex-direction: column;
-    height: 100%;
+    flex: 1; /* Make subviews fill the wrapper */
 }
 #phone-sim-panel-v10-0 #phoneapp-view .phone-contact-list,
 #phone-sim-panel-v10-0 #phoneapp-view .call-log-list {

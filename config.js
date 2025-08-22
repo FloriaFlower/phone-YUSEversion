@@ -7,6 +7,7 @@ export const PhoneSim_Config = {
     WORLD_CALL_LOG_DB_NAME: '手机模拟器_通话记录',
     WORLD_BROWSER_DATABASE: '手机模拟器_浏览器数据库',
     WORLD_FORUM_DATABASE: '手机模拟器_论坛数据库',
+    WORLD_LIVECENTER_DATABASE: '手机模拟器_直播数据',
     PLAYER_ID: 'PLAYER_USER',
     PANEL_ID: 'phone-sim-panel-v10-0',
     TOGGLE_BUTTON_ID: 'phone-sim-toggle-btn-v10-0',

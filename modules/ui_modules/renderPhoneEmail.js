@@ -62,8 +62,7 @@ export function renderCallLogView() {
 
 export function renderEmailList() {
     const view = jQuery_API(parentWin.document.body).find('#emailapp-view');
-    view.html(`<div class="email-list-subview subview active"><div class="app-header"><button class="back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>邮箱</h3></div><div class="email-list-content"></div></div><div class="email-detail-subview subview"></div>`);
-    const emailList = view.find('.email-list-content');
+    const emailList = view.find('.email-list-content').empty();
     const emails = PhoneSim_State.emails.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     if (emails.length === 0) { emailList.html('<div class="email-empty-state">无邮件</div>'); return; }
@@ -76,13 +75,13 @@ export function renderEmailList() {
 }
 
 export function renderEmailDetail(emailId) {
-    const view = jQuery_API(parentWin.document.body).find('#emailapp-view');
-    view.find('.email-list-subview').removeClass('active');
-    const detailView = view.find('.email-detail-subview').addClass('active').empty();
+    const detailView = jQuery_API(parentWin.document.body).find('#emaildetail-view');
+    const scrollContent = detailView.find('.email-detail-scroll-content').empty();
+    const actions = detailView.find('.email-actions').empty();
 
     const email = PhoneSim_State.emails.find(e => e.id === emailId);
     if (!email) {
-        detailView.html('<div class="app-header"><button class="back-to-email-list-btn"><i class="fas fa-chevron-left"></i></button><h3>邮件详情</h3></div><div>邮件未找到</div>');
+        scrollContent.html('<div>邮件未找到</div>');
         return;
     }
 
@@ -91,8 +90,6 @@ export function renderEmailDetail(emailId) {
             await DataHandler.markEmailAsRead(emailId);
             await DataHandler.fetchAllEmails();
             UI.updateGlobalUnreadCounts();
-            // No need to check if list is active, just re-render it to remove the 'unread' style
-            UI.renderEmailList(); 
         })();
     }
 
@@ -112,31 +109,28 @@ export function renderEmailDetail(emailId) {
             </div>
         </div>` : '';
 
-    const detailHtml = `
-        <div class="app-header">
-            <button class="back-to-email-list-btn"><i class="fas fa-chevron-left"></i></button><h3>邮件</h3>
-        </div>
-        <div class="email-detail-scroll-content">
-            <div class="email-detail-header-new">
-                <div class="email-detail-title">${email.subject}</div>
-                <div class="email-detail-info">
-                    <div class="email-detail-sender">
-                        <img class="sender-avatar" src="${avatar}">
-                        <div>
-                            <div style="font-weight: bold; color: #333;">${email.from_name}</div>
-                            <div>${email.from_id}</div>
-                        </div>
+    const detailContentHtml = `
+        <div class="email-detail-header-new">
+            <div class="email-detail-title">${email.subject}</div>
+            <div class="email-detail-info">
+                <div class="email-detail-sender">
+                    <img class="sender-avatar" src="${avatar}">
+                    <div>
+                        <div style="font-weight: bold; color: #333;">${email.from_name}</div>
+                        <div>${email.from_id}</div>
                     </div>
-                    <div>${new Date(email.timestamp).toLocaleString()}</div>
                 </div>
+                <div>${new Date(email.timestamp).toLocaleString()}</div>
             </div>
-            <div class="email-detail-body">${formattedContent}</div>
-            ${attachmentHtml}
         </div>
-        <div class="email-actions">
-            <button class="action-button reply-button" data-sender-name="${email.from_name}"><i class="fas fa-reply"></i>回复</button>
-            ${email.attachment ? '<button class="action-button accept-button"><i class="fas fa-check"></i>收下</button>' : ''}
-        </div>`;
-
-    detailView.html(detailHtml);
+        <div class="email-detail-body">${formattedContent}</div>
+        ${attachmentHtml}
+    `;
+    scrollContent.html(detailContentHtml);
+    
+    const actionsHtml = `
+        <button class="action-button reply-button" data-sender-name="${email.from_name}"><i class="fas fa-reply"></i>回复</button>
+        ${email.attachment ? '<button class="action-button accept-button"><i class="fas fa-check"></i>收下</button>' : ''}
+    `;
+    actions.html(actionsHtml);
 }

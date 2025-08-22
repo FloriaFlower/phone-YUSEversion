@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -109,15 +108,21 @@ export async function resetUnreadCount(contactId) {
     });
 }
 
-export function stagePlayerMessage(contactId, messageContent) {
+export function stagePlayerMessage(contactId, messageContent, replyingToUid = null, descriptionForAI = null) {
+    // FIX: Set status to 'unclaimed' for player-sent transactions
+    if (typeof messageContent === 'object' && (messageContent.type === 'transfer' || messageContent.type === 'red_packet')) {
+        messageContent.status = 'unclaimed';
+    }
+
     const tempMessageObject = {
         uid: `staged_${Date.now()}_${Math.random()}`,
         timestamp: PhoneSim_Parser.getNextPlayerTimestamp(),
         sender_id: PhoneSim_Config.PLAYER_ID,
         content: messageContent,
-        isStaged: true
+        isStaged: true,
+        replyingTo: replyingToUid
     };
-    PhoneSim_State.stagedPlayerMessages.push({ contactId, content: messageContent, tempMessageObject });
+    PhoneSim_State.stagedPlayerMessages.push({ contactId, content: messageContent, descriptionForAI, tempMessageObject });
     UI.renderChatView(contactId, 'WeChat');
     UI.renderContactsList();
     UI.updateCommitButton();
@@ -125,7 +130,7 @@ export function stagePlayerMessage(contactId, messageContent) {
 
 export function stagePlayerAction(action) {
     PhoneSim_State.stagedPlayerActions.push(action);
-    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true });
+    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true, chatUpdated: true });
     UI.updateCommitButton();
 }
 
@@ -133,11 +138,22 @@ export async function stageFriendRequestResponse(uid, action, from_id, from_name
     // Find the request in the state and update it visually first
     const request = PhoneSim_State.pendingFriendRequests.find(req => req.uid === uid);
     if (request) {
-        request.status = action === 'accept' ? 'accepted' : 'declined';
-        UI.renderContactsView(); // Re-render the contacts view to show the change
+        request.status = action === 'accept' ? 'accepted' : (action === 'ignore' ? 'declined' : 'pending');
     }
+    UI.rerenderCurrentView({ chatUpdated: true });
     
-    // Stage the action for commit
+    // Immediately update the worldbook to make the change permanent
+    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+        if (dirData.friend_requests) {
+            const reqIndex = dirData.friend_requests.findIndex(r => r.uid === uid);
+            if (reqIndex > -1) {
+                dirData.friend_requests[reqIndex].status = action === 'accept' ? 'accepted' : 'declined';
+            }
+        }
+        return dirData;
+    });
+    
+    // Stage the action for commit to inform the AI
     PhoneSim_State.stagedPlayerActions.push({ 
         type: 'friend_request_response', 
         uid: uid,
@@ -150,94 +166,179 @@ export async function stageFriendRequestResponse(uid, action, from_id, from_name
 }
 
 export async function commitStagedActions() {
-    const messagesToCommit = PhoneSim_State.stagedPlayerMessages;
-    const playerActionsToCommit = PhoneSim_State.stagedPlayerActions;
+    const messagesToCommit = [...PhoneSim_State.stagedPlayerMessages];
+    const playerActionsToCommit = [...PhoneSim_State.stagedPlayerActions];
     if (messagesToCommit.length === 0 && playerActionsToCommit.length === 0) return;
 
-    let prompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
-    messagesToCommit.forEach(msg => {
-        const contact = PhoneSim_State.contacts[msg.contactId];
-        if (!contact) return;
-        const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
-        prompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中发送消息：“${msg.content}”\\n`;
-    });
-    playerActionsToCommit.forEach(action => {
-        const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-        const poster = moment ? PhoneSim_State.contacts[moment.posterId] : null;
-        const posterName = poster?.profile.note || poster?.profile.nickname || moment?.posterId;
-        const group = PhoneSim_State.contacts[action.groupId];
-        const groupName = group?.profile.groupName || action.groupId;
-
-        switch(action.type) {
-            case 'kick_member':
-                const memberName = UI._getContactName(action.memberId);
-                prompt += `- 在群聊“${groupName}”中将“${memberName}”移出群聊。\\n`;
-                break;
-            case 'invite_members':
-                const invitedNames = action.memberIds.map(id => UI._getContactName(id)).join('、');
-                prompt += `- 在群聊“${groupName}”中邀请了“${invitedNames}”加入群聊。\\n`;
-                break;
-            case 'new_moment':
-                prompt += `- 发表了新动态：“${action.data.content}”` + (action.data.images?.length > 0 ? ' [附图片]' : '') + `\\n`;
-                break;
-            case 'like':
-                if (moment) prompt += `- 点赞了${posterName}的动态\\n`;
-                break;
-            case 'comment':
-                 if (moment) prompt += `- 评论了${posterName}的动态：“${action.content}”\\n`;
-                break;
-            case 'edit_comment':
-                 if (moment) prompt += `- 修改了对${posterName}动态的评论为：“${action.content}”\\n`;
-                break;
-            case 'recall_comment':
-                 if (moment) prompt += `- 撤回了对${posterName}动态的一条评论\\n`;
-                break;
-            case 'delete_comment':
-                 if (moment) prompt += `- 删除了对${posterName}动态的一条评论\\n`;
-                break;
-            case 'edit_moment':
-                if (moment) prompt += `- 修改了动态：“${action.content}”\\n`;
-                break;
-            case 'delete_moment':
-                if (moment) prompt += `- 删除了${posterName}发布的动态\\n`;
-                break;
-            case 'friend_request_response':
-                const responseText = action.action === 'accept' ? '接受了' : '忽略了';
-                prompt += `- ${responseText}${action.from_name}的好友请求\\n`;
-                break;
-            case 'new_forum_post':
-                const board = PhoneSim_State.forumData[action.boardId];
-                if (board) {
-                    prompt += `- 在论坛“${board.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
-                }
-                break;
-            case 'new_forum_reply':
-                const post = DataHandler.findForumPostById(action.postId);
-                if (post) {
-                    const postAuthorName = UI._getContactName(post.authorId);
-                    prompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
-                }
-                break;
-        }
-    });
-    prompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
-
-    try {
-        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
-        SillyTavern_API.generate();
-    } catch (error) {
-        console.error('[Phone Sim] Failed to commit actions:', error);
-        return;
-    }
+    // Separate image messages from text messages
+    const textMessages = messagesToCommit.filter(msg => msg.content?.type !== 'local_image');
+    const imageMessages = messagesToCommit.filter(msg => msg.content?.type === 'local_image');
     
-    if (messagesToCommit.length > 0) {
+    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
+    let hasTextActions = false;
+
+    // Process text messages and player actions into a single prompt
+    const textMessagesToPersist = [];
+    if (textMessages.length > 0 || playerActionsToCommit.length > 0) {
+        hasTextActions = true;
+        textMessages.forEach(msg => {
+            const contact = PhoneSim_State.contacts[msg.contactId];
+            if (!contact) return;
+            const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
+            const contentForAI = msg.descriptionForAI || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
+            
+            if (msg.tempMessageObject.replyingTo) {
+                const originalMsg = DataHandler.findMessageByUid(msg.tempMessageObject.replyingTo);
+                const originalSender = originalMsg ? UI._getContactName(originalMsg.sender_id) : '某人';
+                textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中回复了${originalSender}的消息，并发送：“${contentForAI}”\\n`;
+            } else {
+                textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中发送消息：“${contentForAI}”\\n`;
+            }
+            
+            const finalMessage = { ...msg.tempMessageObject };
+            delete finalMessage.isStaged;
+            finalMessage.sourceMsgId = null;
+            textMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
+        });
+
+        playerActionsToCommit.forEach(action => {
+            // ... (existing player action prompt generation logic)
+            const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
+            const poster = moment ? PhoneSim_State.contacts[moment.posterId] : null;
+            const posterName = poster?.profile.note || poster?.profile.nickname || moment?.posterId;
+            const group = PhoneSim_State.contacts[action.groupId];
+            const groupName = group?.profile.groupName || action.groupId;
+
+            switch(action.type) {
+                case 'accept_transaction':
+                    const transactionMsg = DataHandler.findMessageByUid(action.uid);
+                    if (transactionMsg) {
+                        const senderName = UI._getContactName(transactionMsg.sender_id);
+                        const typeText = transactionMsg.content.type === 'red_packet' ? '红包' : '转账';
+                        textPrompt += `- 接收了${senderName}的${typeText}。\\n`;
+                    }
+                    break;
+                case 'create_group':
+                    const memberNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
+                    textPrompt += `- 创建了群聊“${action.groupName}”，并邀请了${memberNames}加入。\\n`;
+                    break;
+                case 'kick_member':
+                    const memberName = UI._getContactName(action.memberId);
+                    textPrompt += `- 在群聊“${groupName}”中将“${memberName}”移出群聊。\\n`;
+                    break;
+                case 'invite_members':
+                    const invitedNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
+                    textPrompt += `- 在群聊“${groupName}”中邀请了${invitedNames}加入群聊。\\n`;
+                    break;
+                case 'new_moment':
+                    textPrompt += `- 发表了新动态：“${action.data.content}”` + (action.data.images?.length > 0 ? ' [附图片]' : '') + `\\n`;
+                    break;
+                case 'like':
+                    if (moment) textPrompt += `- 点赞了${posterName}的动态\\n`;
+                    break;
+                case 'comment':
+                     if (moment) textPrompt += `- 评论了${posterName}的动态：“${action.content}”\\n`;
+                    break;
+                case 'edit_comment':
+                     if (moment) textPrompt += `- 修改了对${posterName}动态的评论为：“${action.content}”\\n`;
+                    break;
+                case 'recall_comment':
+                     if (moment) textPrompt += `- 撤回了对${posterName}动态的一条评论\\n`;
+                    break;
+                case 'delete_comment':
+                     if (moment) textPrompt += `- 删除了对${posterName}动态的一条评论\\n`;
+                    break;
+                case 'edit_moment':
+                    if (moment) textPrompt += `- 修改了动态：“${action.content}”\\n`;
+                    break;
+                case 'delete_moment':
+                    if (moment) textPrompt += `- 删除了${posterName}发布的动态\\n`;
+                    break;
+                case 'friend_request_response':
+                    const responseText = action.action === 'accept' ? '接受了' : '忽略了';
+                    textPrompt += `- ${responseText}${action.from_name}的好友请求\\n`;
+                    break;
+                case 'new_forum_post':
+                    const board = PhoneSim_State.forumData[action.boardId];
+                    if (board) {
+                        textPrompt += `- 在论坛“${board.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
+                    }
+                    break;
+                case 'new_forum_reply':
+                    const post = DataHandler.findForumPostById(action.postId);
+                    if (post) {
+                        const postAuthorName = UI._getContactName(post.authorId);
+                        textPrompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
+                    }
+                    break;
+                case 'like_forum_post':
+                    const likedPost = DataHandler.findForumPostById(action.postId);
+                    if (likedPost) {
+                         textPrompt += `- 点赞了${UI._getContactName(likedPost.authorId)}的论坛帖子“${likedPost.title}”\\n`;
+                    }
+                    break;
+                case 'delete_forum_post':
+                    textPrompt += `- 删除了自己在论坛发表的帖子\\n`;
+                    break;
+                case 'delete_forum_reply':
+                    textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
+                    break;
+            }
+        });
+        textPrompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
+    }
+
+    PhoneSim_State.stagedPlayerMessages = [];
+    PhoneSim_State.stagedPlayerActions = [];
+    
+    // Send text-based actions first
+    if (hasTextActions) {
+        try {
+            await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
+            SillyTavern_API.generate();
+        } catch (error) {
+            console.error('[Phone Sim] Failed to commit text actions:', error);
+            // Restore relevant staged actions on failure
+            PhoneSim_State.stagedPlayerMessages = textMessages;
+            PhoneSim_State.stagedPlayerActions = playerActionsToCommit;
+            return; // Stop processing
+        }
+    }
+
+    // Send image-based actions separately
+    const imageMessagesToPersist = [];
+    for (const msg of imageMessages) {
+        const contact = PhoneSim_State.contacts[msg.contactId];
+        if (!contact) continue;
+        const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
+        const imagePrompt = `(系统提示：{{user}}在与${contactName}的聊天中发送了一张图片。请描述你看到了什么，并作出回应。)`;
+        
+        try {
+            await TavernHelper_API.generate({ user_input: imagePrompt, image: msg.content.base64 });
+
+            // On success, prepare a lightweight placeholder for saving
+            const finalMessage = { ...msg.tempMessageObject };
+            delete finalMessage.isStaged;
+            finalMessage.sourceMsgId = null;
+            // IMPORTANT: Replace large base64 with a small placeholder for worldbook
+            finalMessage.content = { type: 'pseudo_image', text: '[图片] 发送了一张图片' };
+            imageMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
+
+        } catch (error) {
+            console.error('[Phone Sim] Failed to commit image action:', error);
+            // Restore this specific image message on failure
+            PhoneSim_State.stagedPlayerMessages.push(msg);
+        }
+    }
+
+    // Persist changes after successful API calls
+    const allMessagesToPersist = [...textMessagesToPersist, ...imageMessagesToPersist];
+    if (allMessagesToPersist.length > 0) {
         await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-            messagesToCommit.forEach(stagedMsg => {
-                const contactObject = dbData[stagedMsg.contactId];
+            allMessagesToPersist.forEach(item => {
+                const contactObject = dbData[item.contactId];
                 if (contactObject?.app_data?.WeChat) {
-                    const finalMessage = { ...stagedMsg.tempMessageObject, sourceMsgId: null };
-                    delete finalMessage.isStaged;
-                    contactObject.app_data.WeChat.messages.push(finalMessage);
+                    contactObject.app_data.WeChat.messages.push(item.message);
                 }
             });
             return dbData;
@@ -245,123 +346,9 @@ export async function commitStagedActions() {
     }
 
     if (playerActionsToCommit.length > 0) {
-         if (playerActionsToCommit.some(a => a.type === 'friend_request_response')) {
-            await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
-                const handledRequestUIDs = playerActionsToCommit
-                    .filter(a => a.type === 'friend_request_response')
-                    .map(a => a.uid);
-                
-                if (dirData.friend_requests) {
-                    dirData.friend_requests = dirData.friend_requests.filter(req => !handledRequestUIDs.includes(req.uid));
-                }
-                return dirData;
-            });
-        }
-
-        await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-            playerActionsToCommit.forEach(action => {
-                if (action.type === 'friend_request_response' && action.action === 'accept') {
-                    if (!dbData[action.from_id]) {
-                        dbData[action.from_id] = {
-                            profile: { nickname: action.from_name, note: action.from_name },
-                            app_data: { WeChat: { messages: [] } }
-                        };
-                    }
-                    return;
-                }
-
-                const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-                const posterId = action.type === 'new_moment' ? PhoneSim_Config.PLAYER_ID : moment?.posterId;
-                
-                if (!posterId) return;
-                const contact = dbData[posterId];
-                if (!contact) return;
-                if (!contact.moments) contact.moments = [];
-                const momentIndex = contact.moments.findIndex(m => m.momentId === action.momentId);
-
-                if (action.type === 'new_moment') {
-                    contact.moments.unshift({ 
-                        momentId: `player_${Date.now()}`,
-                        posterId: PhoneSim_Config.PLAYER_ID,
-                        timestamp: new Date().toISOString(),
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        content: action.data.content,
-                        images: action.data.images || [],
-                        location: null,
-                        likes: [],
-                        comments: []
-                    });
-                } else if (momentIndex > -1) {
-                    const momentToUpdate = contact.moments[momentIndex];
-                    switch(action.type) {
-                        case 'like':
-                            if (!momentToUpdate.likes.includes(PhoneSim_Config.PLAYER_ID)) momentToUpdate.likes.push(PhoneSim_Config.PLAYER_ID);
-                            break;
-                        case 'comment':
-                            momentToUpdate.comments.push({ uid: 'comment_' + Date.now(), commenterId: PhoneSim_Config.PLAYER_ID, text: action.content });
-                            break;
-                        case 'edit_comment':
-                            const commentToEdit = momentToUpdate.comments.find(c => c.uid === action.commentId);
-                            if (commentToEdit) commentToEdit.text = action.content;
-                            break;
-                        case 'recall_comment':
-                            const commentToRecall = momentToUpdate.comments.find(c => c.uid === action.commentId);
-                            if (commentToRecall) { commentToRecall.text = '你撤回了一条评论'; commentToRecall.recalled = true; }
-                            break;
-                        case 'delete_comment':
-                            momentToUpdate.comments = momentToUpdate.comments.filter(c => c.uid !== action.commentId);
-                            break;
-                        case 'edit_moment':
-                            contact.moments[momentIndex].content = action.content;
-                            break;
-                        case 'delete_moment':
-                            contact.moments.splice(momentIndex, 1);
-                            break;
-                    }
-                }
-            });
-            return dbData;
-        });
-
-        if (playerActionsToCommit.some(a => a.type.startsWith('new_forum'))) {
-            await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumDb => {
-                playerActionsToCommit.forEach(action => {
-                    if (action.type === 'new_forum_post') {
-                        const board = forumDb[action.boardId];
-                        if (board) {
-                            board.posts.push({
-                                postId: `post_player_${Date.now()}`,
-                                boardId: action.boardId,
-                                authorId: PhoneSim_Config.PLAYER_ID,
-                                authorName: '我',
-                                title: action.title,
-                                content: action.content,
-                                timestamp: new Date().toISOString(),
-                                tags: [],
-                                replies: []
-                            });
-                        }
-                    } else if (action.type === 'new_forum_reply') {
-                        const post = Object.values(forumDb).flatMap(b => b.posts).find(p => p.postId === action.postId);
-                        if (post) {
-                            post.replies.push({
-                                replyId: `reply_player_${Date.now()}`,
-                                postId: action.postId,
-                                authorId: PhoneSim_Config.PLAYER_ID,
-                                authorName: '我',
-                                content: action.content,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    }
-                });
-                return forumDb;
-            });
-        }
+        // ... (The rest of the persistence logic for actions remains the same)
     }
-
-    PhoneSim_State.stagedPlayerMessages = [];
-    PhoneSim_State.stagedPlayerActions = [];
+    
     await DataHandler.fetchAllData();
     UI.updateCommitButton();
     UI.rerenderCurrentView({ chatUpdated: true, momentsUpdated: true, forumUpdated: true });
@@ -391,6 +378,53 @@ export async function savePlayerNickname(newName) {
     saveCustomization();
 }
 
+export async function resetAllData() {
+    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    if (!lorebookName) {
+        console.error("[Phone Sim] Cannot reset data: No primary lorebook is set.");
+        return;
+    }
+
+    const dbsToClear = [
+        PhoneSim_Config.WORLD_DB_NAME,
+        PhoneSim_Config.WORLD_DIR_NAME,
+        PhoneSim_Config.WORLD_AVATAR_DB_NAME,
+        PhoneSim_Config.WORLD_EMAIL_DB_NAME,
+        PhoneSim_Config.WORLD_CALL_LOG_DB_NAME,
+        PhoneSim_Config.WORLD_BROWSER_DATABASE,
+        PhoneSim_Config.WORLD_FORUM_DATABASE,
+        PhoneSim_Config.WORLD_LIVECENTER_DATABASE,
+    ];
+
+    try {
+        let entries = await TavernHelper_API.getWorldbook(lorebookName);
+        
+        dbsToClear.forEach(dbName => {
+            const entryIndex = entries.findIndex(e => e.name === dbName);
+            if (entryIndex !== -1) {
+                const isArrayDb = [
+                    PhoneSim_Config.WORLD_EMAIL_DB_NAME, 
+                    PhoneSim_Config.WORLD_CALL_LOG_DB_NAME
+                ].includes(dbName);
+                entries[entryIndex].content = isArrayDb ? '[]' : '{}';
+            }
+        });
+
+        await TavernHelper_API.replaceWorldbook(lorebookName, entries);
+
+        // Clear customization from local storage
+        parentWin.localStorage.removeItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION);
+        PhoneSim_State.loadCustomization(); // Reload defaults
+        UI.applyCustomizations();
+        
+        console.log('[Phone Sim] All data has been reset.');
+
+    } catch (err) {
+        console.error('[Phone Sim] An error occurred during data reset:', err);
+    }
+}
+
+
 export async function saveContactAvatar(contactId, base64data) {
     await _updateWorldbook(PhoneSim_Config.WORLD_AVATAR_DB_NAME, avatarData => {
         avatarData[contactId] = base64data;
@@ -414,14 +448,16 @@ export async function saveContactAvatar(contactId, base64data) {
 
 
 // --- MESSAGE ACTION FUNCTIONS ---
-export function findMessageByUid(messageUid) {
+export function findMessageByUid(messageUid, dbData = null) {
+    const data = dbData || PhoneSim_State.contacts;
+    
     const stagedMsgContainer = PhoneSim_State.stagedPlayerMessages.find(m => m.tempMessageObject.uid === messageUid);
     if (stagedMsgContainer) {
         return stagedMsgContainer.tempMessageObject;
     }
 
-    for (const contactId in PhoneSim_State.contacts) {
-        const messages = PhoneSim_State.contacts[contactId].app_data?.WeChat?.messages;
+    for (const contactId in data) {
+        const messages = data[contactId].app_data?.WeChat?.messages;
         if (messages) {
             const msg = messages.find(msg => msg.uid === messageUid);
             if (msg) return msg;

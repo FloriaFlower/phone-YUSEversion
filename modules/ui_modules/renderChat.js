@@ -1,7 +1,7 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
+import { stickers } from '../stickers.js';
 
 let jQuery_API, parentWin, UI, DataHandler;
 
@@ -11,7 +11,6 @@ let displayedMessageCount = INITIAL_MESSAGE_LOAD_COUNT;
 let isRendering = false;
 let isLoadingMore = false;
 
-let animationQueues = {};
 let isAnimatingFlags = {};
 
 export function init(deps, dataHandler, uiObject) {
@@ -19,6 +18,48 @@ export function init(deps, dataHandler, uiObject) {
     parentWin = deps.win;
     UI = uiObject;
     DataHandler = dataHandler;
+}
+
+function _getSnippetFromContent(content) {
+    if (typeof content === 'string') {
+        if (content.startsWith('[图片:')) return '[图片]';
+        return content.substring(0, 30) + (content.length > 30 ? '...' : '');
+    }
+    if (typeof content === 'object' && content !== null) {
+        switch (content.type) {
+            case 'image': case 'pseudo_image': return '[图片]';
+            case 'voice': return '[语音]';
+            case 'transfer': return '[转账]';
+            case 'red_packet': return '[红包]';
+            case 'location': return '[位置]';
+            case 'call_end': return '[通话]';
+            default: return '[消息]';
+        }
+    }
+    if (Array.isArray(content)) {
+        return '[图文消息]';
+    }
+    return '...';
+}
+
+export function showReplyPreview(message) {
+    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const previewBar = p.find('.reply-preview-bar');
+    const previewContent = previewBar.find('.reply-preview-content');
+
+    PhoneSim_State.activeReplyUid = message.uid;
+    const senderName = UI._getContactName(message.sender_id);
+    const snippet = _getSnippetFromContent(message.content);
+
+    previewContent.html(`回复 <b>${jQuery_API('<div>').text(senderName).html()}</b>: ${jQuery_API('<div>').text(snippet).html()}`);
+    previewBar.slideDown(200);
+}
+
+export function hideReplyPreview() {
+    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const previewBar = p.find('.reply-preview-bar');
+    previewBar.slideUp(200);
+    PhoneSim_State.activeReplyUid = null;
 }
 
 export function renderContactsList() {
@@ -62,21 +103,14 @@ export function renderContactsList() {
         let time = '';
 
         if (lastMessage) {
-            if (lastMessage.recalled) {
+            if (lastMessage.replyingTo) {
+                preview = `[回复] ${_getSnippetFromContent(lastMessage.content)}`;
+            } else if (lastMessage.recalled) {
                 preview = '撤回了一条消息';
             } else if (lastMessage.requestData?.type === 'friend_request') {
                 preview = '请求添加你为好友';
-            } else if (typeof lastMessage.content === 'string') {
-                preview = lastMessage.content;
-            } else if (typeof lastMessage.content === 'object' && lastMessage.content !== null) {
-                switch (lastMessage.content.type) {
-                    case 'image': case 'pseudo_image': preview = '[图片]'; break;
-                    case 'voice': preview = '[语音]'; break;
-                    case 'transfer': preview = '[转账]'; break;
-                    case 'red_packet': preview = '[红包]'; break;
-                    case 'location': preview = '[位置]'; break;
-                    default: preview = '[消息]';
-                }
+            } else {
+                preview = _getSnippetFromContent(lastMessage.content);
             }
             time = new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         }
@@ -101,21 +135,13 @@ export function renderContactsList() {
 
 export function renderContactsView() {
     const listContent = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .contacts-list-content`).empty();
+    const requests = PhoneSim_State.pendingFriendRequests || [];
 
-    // Render friend requests
-    if (PhoneSim_State.pendingFriendRequests.length > 0) {
+    const pendingRequests = requests.filter(req => req.status === 'pending');
+    if (pendingRequests.length > 0) {
         listContent.append('<div class="contact-group-header">新的朋友</div>');
-        PhoneSim_State.pendingFriendRequests.forEach(req => {
+        pendingRequests.forEach(req => {
             const avatar = UI.generateDefaultAvatar(req.from_name);
-            let actionsHtml;
-            if (req.status === 'pending') {
-                actionsHtml = `<div class="request-actions">
-                    <button class="request-btn accept-btn" data-action="accept">接受</button>
-                </div>`;
-            } else {
-                actionsHtml = `<div class="request-status">${req.status === 'accepted' ? '已添加' : '已忽略'}</div>`;
-            }
-
             const itemHtml = `
                 <div class="contact-item new-friend-request-item" data-uid="${req.uid}" data-from-id="${req.from_id}" data-from-name="${req.from_name}">
                     <img src="${avatar}" class="contact-item-avatar">
@@ -123,204 +149,285 @@ export function renderContactsView() {
                         <div class="contact-item-name">${req.from_name}</div>
                         <div class="request-message">${req.content}</div>
                     </div>
-                    ${actionsHtml}
+                    <div class="request-actions">
+                        <button class="request-btn ignore-btn" data-action="ignore">忽略</button>
+                        <button class="request-btn accept-btn" data-action="accept">接受</button>
+                    </div>
                 </div>`;
             listContent.append(itemHtml);
         });
     }
-
-    // Render existing contacts
-    listContent.append('<div class="contact-group-header">联系人</div>');
-    const sortedContacts = Object.entries(PhoneSim_State.contacts)
-        .filter(([id, c]) => id !== PhoneSim_Config.PLAYER_ID && !id.startsWith('group_') && c.profile)
-        .sort(([, a], [, b]) => (a.profile.note || a.profile.nickname).localeCompare(b.profile.note || b.profile.nickname, 'zh-Hans-CN'));
     
-    for (const [id, c] of sortedContacts) {
-        const name = c.profile.note || c.profile.nickname;
-        const avatar = c.profile.avatar || UI.generateDefaultAvatar(name);
-        const hasChat = c.app_data?.WeChat?.messages?.length > 0;
-        listContent.append(`<div class="contact-item ${hasChat ? 'has-chat' : ''}" data-id="${id}"><img src="${avatar}" class="contact-item-avatar"><span class="contact-item-name">${name}</span></div>`);
-    }
+    const allContacts = Object.entries(PhoneSim_State.contacts)
+        .filter(([id, c]) => id !== PhoneSim_Config.PLAYER_ID && !id.startsWith('group_') && c.profile)
+        .map(([id, contact]) => ({
+            id,
+            name: contact.profile.note || contact.profile.nickname,
+            avatar: contact.profile.avatar || UI.generateDefaultAvatar(contact.profile.note || contact.profile.nickname)
+        }));
+
+    allContacts.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+
+    const groupedContacts = allContacts.reduce((acc, contact) => {
+        let firstLetter = contact.name.charAt(0).toUpperCase();
+        if (!/^[A-Z]$/.test(firstLetter)) {
+            firstLetter = '#';
+        }
+        if (!acc[firstLetter]) {
+            acc[firstLetter] = [];
+        }
+        acc[firstLetter].push(contact);
+        return acc;
+    }, {});
+
+    const sortedGroupKeys = Object.keys(groupedContacts).sort((a, b) => {
+        if (a === '#') return 1;
+        if (b === '#') return -1;
+        return a.localeCompare(b);
+    });
+    
+    sortedGroupKeys.forEach(key => {
+        listContent.append(`<div class="contact-group-header">${key}</div>`);
+        groupedContacts[key].forEach(c => {
+            listContent.append(`<div class="contact-item" data-id="${c.id}"><img src="${c.avatar}" class="contact-item-avatar"><span class="contact-item-name">${c.name}</span></div>`);
+        });
+    });
 }
 
 export function renderMeView() {
     const content = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .me-content`).empty();
-    const avatar = PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar(PhoneSim_State.customization.playerNickname);
-    const nickname = PhoneSim_State.customization.playerNickname || '我';
-    const id = PhoneSim_Config.PLAYER_ID;
-    
-    const html = `
+    const { customization } = PhoneSim_State;
+
+    const avatar = customization.playerAvatar || UI.generateDefaultAvatar(customization.playerNickname || '我');
+    const nickname = customization.playerNickname || '我';
+    const mockWeChatId = (nickname === '我' ? 'player' : nickname.toLowerCase().replace(/\s/g, '_')) + `_${Math.random().toString(36).substr(2, 4)}`;
+
+    const meHtml = `
         <div class="me-profile-card">
             <img src="${avatar}" class="me-avatar">
             <div class="me-info">
-                <h2 class="me-nickname">${nickname}</h2>
-                <p class="me-id">ID: ${id}</p>
+                <h3 class="me-nickname">${nickname}</h3>
+                <p class="me-id">微信号: ${mockWeChatId}</p>
             </div>
         </div>
+        
+        <div class="settings-group" style="margin-top: 20px;">
+             <div class="settings-item"><span><i class="fas fa-wallet fa-fw" style="color: #07c160; margin-right: 10px;"></i> 服务</span><i class="fas fa-chevron-right"></i></div>
+        </div>
+        <div class="settings-group" style="margin-top: 8px;">
+            <div class="settings-item"><span><i class="fas fa-star fa-fw" style="color: #ffc107; margin-right: 10px;"></i> 收藏</span><i class="fas fa-chevron-right"></i></div>
+            <div class="settings-item" id="me-view-moments-link"><span><i class="fas fa-images fa-fw" style="color: #007aff; margin-right: 10px;"></i> 朋友圈</span><i class="fas fa-chevron-right"></i></div>
+            <div class="settings-item"><span><i class="fas fa-smile fa-fw" style="color: #ffc107; margin-right: 10px;"></i> 表情</span><i class="fas fa-chevron-right"></i></div>
+        </div>
+        <div class="settings-group" style="margin-top: 8px;">
+            <div class="settings-item" id="me-view-settings-link"><span><i class="fas fa-cog fa-fw" style="color: #007aff; margin-right: 10px;"></i> 设置</span><i class="fas fa-chevron-right"></i></div>
+        </div>
     `;
-    content.html(html);
+
+    content.html(meHtml);
+
+    // Add click handlers for navigation
+    content.find('#me-view-settings-link').on('click.phonesim.meview', () => {
+        UI.showView('SettingsApp');
+    });
+    content.find('#me-view-moments-link').on('click.phonesim.meview', () => {
+        UI.showView('Moments');
+    });
 }
 
+export function renderDiscoverView() { /* Placeholder */ }
 
-async function _renderMessages(messagesContainer, allMessages, isGroup) {
-    if (isRendering) return;
-    isRendering = true;
-
-    const messagesToDisplay = allMessages.slice(-displayedMessageCount);
-    
+function _buildMessagesHtml(messagesToRender, allMessages) {
     let html = '';
     let lastTimestamp = null;
-    
-    messagesToDisplay.forEach(s => {
-        const currentTimestamp = new Date(s.timestamp);
-        if (!lastTimestamp || (currentTimestamp - lastTimestamp) / (1000 * 60) > 30) {
+    let lastReadMessageIndex = allMessages.findIndex(msg => msg.uid === PhoneSim_State.contacts[PhoneSim_State.activeContactId]?.lastReadMessageUid);
+
+    messagesToRender.forEach(msg => {
+        const currentTimestamp = new Date(msg.timestamp);
+
+        if (!lastTimestamp || currentTimestamp - lastTimestamp > 10 * 60 * 1000) {
             html += `<div class="time-divider"><span>${UI.getDividerText(currentTimestamp)}</span></div>`;
         }
-        
-        if (s.isSystemNotification) {
-            html += UI.renderSystemMessage(s);
+
+        if (msg.isSystemNotification) {
+             html += UI.renderSystemMessage(msg);
+        } else if (msg.requestData?.type === 'friend_request') {
+            html += UI.renderInteractiveMessage(msg);
         } else {
-            html += UI.renderSingleMessage(s, isGroup);
+            html += UI.renderSingleMessage(msg, PhoneSim_State.activeContactId.startsWith('group_'));
         }
+
         lastTimestamp = currentTimestamp;
     });
 
-    messagesContainer.html(`<div class="chat-loader" style="display: none;"></div>` + html);
+    return html;
+}
+
+export async function renderChatView(contactId, app, isAnimated = true) {
+    if (isRendering) return;
+    isRendering = true;
+
+    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const chatView = p.find('#chatconversation-view');
+    const messagesContainer = chatView.find('.chat-messages');
+
+    PhoneSim_State.activeContactId = contactId;
+    const contact = PhoneSim_State.contacts[contactId];
+
+    if (!contact || !contact.profile) {
+        messagesContainer.html('<div class="email-empty-state">无法加载对话</div>');
+        isRendering = false;
+        return;
+    }
     
-    const loader = messagesContainer.find('.chat-loader');
-    if (displayedMessageCount >= allMessages.length) {
-        loader.hide();
-    } else {
-        loader.show();
+    UI.hideReplyPreview();
+
+    const isGroup = contactId.startsWith('group_');
+    const name = isGroup ? contact.profile.groupName : (contact.profile.note || contact.profile.nickname);
+    const avatar = contact.profile.avatar || UI.generateDefaultAvatar(name);
+
+    chatView.find('.chat-name').text(name);
+    chatView.find('.header-avatar').attr('src', avatar).data('contact-id', contactId);
+    chatView.find('.members-btn').toggle(isGroup).data('group-id', contactId);
+    chatView.find('.edit-note-btn').toggle(!isGroup);
+    chatView.find('.header-status').toggle(!isGroup);
+
+
+    const allMessages = [
+        ...(contact.app_data?.WeChat?.messages || []),
+        ...PhoneSim_State.stagedPlayerMessages.filter(msg => msg.contactId === contactId).map(m => m.tempMessageObject)
+    ];
+
+    messagesContainer.off('scroll.phonesim-lazyload');
+    messagesContainer.empty();
+
+    if (allMessages.length === 0) {
+        isRendering = false;
+        return;
+    }
+    
+    let messagesToRender = allMessages;
+    displayedMessageCount = allMessages.length;
+
+    if (allMessages.length > INITIAL_MESSAGE_LOAD_COUNT) {
+        messagesToRender = allMessages.slice(-INITIAL_MESSAGE_LOAD_COUNT);
+        displayedMessageCount = INITIAL_MESSAGE_LOAD_COUNT;
+        
+        messagesContainer.on('scroll.phonesim-lazyload', UI.throttle(async () => {
+            if (messagesContainer.scrollTop() === 0 && !isLoadingMore && displayedMessageCount < allMessages.length) {
+                isLoadingMore = true;
+                const loader = chatView.find('.chat-loader').show();
+                const oldScrollHeight = messagesContainer[0].scrollHeight;
+
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                const nextBatchSize = Math.min(LOAD_MORE_COUNT, allMessages.length - displayedMessageCount);
+                const nextMessagesToShow = allMessages.slice(-(displayedMessageCount + nextBatchSize), -displayedMessageCount);
+                
+                if (nextMessagesToShow.length > 0) {
+                    const newHtml = _buildMessagesHtml(nextMessagesToShow, allMessages);
+                    messagesContainer.prepend(newHtml);
+                    const newScrollHeight = messagesContainer[0].scrollHeight;
+                    messagesContainer.scrollTop(newScrollHeight - oldScrollHeight);
+                    displayedMessageCount += nextBatchSize;
+                }
+                
+                if (displayedMessageCount >= allMessages.length) {
+                    messagesContainer.off('scroll.phonesim-lazyload');
+                    loader.remove();
+                } else {
+                    loader.hide();
+                }
+                isLoadingMore = false;
+            }
+        }, 200));
+    }
+    
+    const messagesHtml = _buildMessagesHtml(messagesToRender, allMessages);
+    messagesContainer.html(messagesHtml);
+
+    if (allMessages.length > INITIAL_MESSAGE_LOAD_COUNT) {
+         messagesContainer.prepend('<div class="chat-loader" style="display: none;">加载中...</div>');
+    }
+    
+    const lastMessage = allMessages[allMessages.length - 1];
+    const shouldScroll = !lastMessage || lastMessage.sender_id === PhoneSim_Config.PLAYER_ID || (messagesContainer[0].scrollHeight - messagesContainer.scrollTop() - messagesContainer.height()) < 200;
+    
+    if (shouldScroll) {
+         messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
     }
 
+    if (contact.unread > 0) {
+        await DataHandler.resetUnreadCount(contactId);
+        contact.unread = 0;
+        await DataHandler.fetchAllContacts();
+        UI.updateGlobalUnreadCounts();
+    }
+    
     isRendering = false;
 }
 
-async function _processAnimationQueue(contactId) {
-    if (isAnimatingFlags[contactId] || !animationQueues[contactId] || animationQueues[contactId].length === 0) {
-        return;
-    }
-    isAnimatingFlags[contactId] = true;
-    const item = animationQueues[contactId].shift();
-
-    try {
-        const container = item.element.closest('.chat-messages');
-        const messageContent = item.element.find('.message-content');
-        
-        if (typeof item.message.content !== 'string') return;
-        
-        const originalHtml = messageContent.html();
-        messageContent.css('min-height', messageContent.height() + 'px');
-        
-        const typingIndicatorHtml = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-        messageContent.html(typingIndicatorHtml);
-        
-        if (container.length > 0 && container[0].scrollHeight - container.scrollTop() - container.height() < 150) {
-            container.animate({ scrollTop: container[0].scrollHeight }, 300);
-        }
-
-        const thinkingTime = Math.min(2500, Math.max(500, (item.message.content.length * 40) + (Math.random() * 500)));
-
-        await new Promise(resolve => setTimeout(resolve, thinkingTime));
-        
-        messageContent.css('opacity', 0).html(originalHtml).css('min-height', '');
-        messageContent.animate({ opacity: 1 }, 200);
-
-        if (container.length > 0 && container[0].scrollHeight - container.scrollTop() - container.height() < 150) {
-            container.animate({ scrollTop: container[0].scrollHeight }, 100);
-        }
-
-    } catch (e) {
-        console.error("Animation failed", e);
-        if (item && item.element) {
-            const messageData = DataHandler.findMessageByUid(item.message.uid);
-            if (messageData) {
-                item.element.find('.message-content').html(UI._renderRichMessage(messageData));
-            }
-        }
-    } finally {
-        isAnimatingFlags[contactId] = false;
-        _processAnimationQueue(contactId);
-    }
-}
-
-
 export function triggerPendingAnimations(contactId) {
-    const pendingUids = PhoneSim_State.pendingAnimations[contactId];
-    if (!pendingUids || pendingUids.length === 0) {
+    if (!PhoneSim_State.pendingAnimations[contactId] || isAnimatingFlags[contactId]) {
         return;
     }
 
-    const messagesContainer = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .chat-messages`);
-    if (!animationQueues[contactId]) {
-        animationQueues[contactId] = [];
-    }
-    
-    pendingUids.forEach(uid => {
-        const messageElement = messagesContainer.find(`.message[data-uid="${uid}"]`);
-        const messageData = DataHandler.findMessageByUid(uid);
-        if (messageElement.length && messageData) {
-            if (!animationQueues[contactId].some(item => item.message.uid === uid)) {
-                animationQueues[contactId].push({ element: messageElement, message: messageData });
-            }
+    isAnimatingFlags[contactId] = true;
+    const queue = [...PhoneSim_State.pendingAnimations[contactId]];
+    PhoneSim_State.pendingAnimations[contactId] = [];
+
+    const processNext = () => {
+        if (queue.length === 0) {
+            isAnimatingFlags[contactId] = false;
+            return;
         }
-    });
-    
-    delete PhoneSim_State.pendingAnimations[contactId];
-    _processAnimationQueue(contactId);
+
+        const uid = queue.shift();
+        const messageEl = jQuery_API(parentWin.document.body).find(`.message[data-uid="${uid}"]`);
+
+        if (messageEl.length) {
+            const typingIndicatorHtml = `<div class="message received typing-indicator-wrapper" data-uid="typing-${uid}">
+                <div class="avatar-container">${messageEl.find('.avatar-container').html()}</div>
+                <div class="message-wrapper">
+                    ${messageEl.find('.sender-name').length > 0 ? `<div class="sender-name">${messageEl.find('.sender-name').html()}</div>` : ''}
+                    <div class="message-content">
+                        <div class="typing-indicator"><span></span><span></span><span></span></div>
+                    </div>
+                </div>
+            </div>`;
+            
+            messageEl.hide();
+            messageEl.before(typingIndicatorHtml);
+            const typingIndicator = messageEl.prev();
+            const messagesContainer = messageEl.closest('.chat-messages');
+            messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
+
+            setTimeout(() => {
+                typingIndicator.remove();
+                messageEl.show();
+                messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
+                PhoneSim_Sounds.play('receive');
+                processNext();
+            }, 1000 + Math.random() * 1500);
+        } else {
+            processNext();
+        }
+    };
+
+    processNext();
 }
 
-export async function renderChatView(cId, app) {
-    if (PhoneSim_State.activeContactId !== cId) {
-        displayedMessageCount = INITIAL_MESSAGE_LOAD_COUNT;
-    }
-    PhoneSim_State.activeContactId = cId;
+export function renderStickerPicker() {
+    const grid = jQuery_API(parentWin.document.body).find('#sticker-picker-grid');
+    if (!grid.length || grid.children().length > 0) return;
 
-    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    const contact = PhoneSim_State.contacts[cId];
-    if (!contact) { return UI.showView('ChatApp'); }
-
-    if (contact.unread > 0) {
-        PhoneSim_State.contacts[cId].unread = 0;
-        await DataHandler.resetUnreadCount(cId);
-        UI.updateGlobalUnreadCounts();
-        UI.renderContactsList();
-    }
-
-    const v = p.find('#chatapp-view');
-    const isGroup = cId.startsWith('group_');
-    const contactName = isGroup ? contact.profile.groupName : (contact.profile.note || contact.profile.nickname);
-    v.find('.chat-name').text(contactName);
-    v.find('.header-avatar').attr('src', contact.profile.avatar || UI.generateDefaultAvatar(contactName));
-    v.find('.edit-note-btn').toggle(!isGroup);
-    v.find('.members-btn').toggle(isGroup).css('display', isGroup ? 'flex' : 'none');
-
-    const messagesContainer = v.find('.chat-messages');
-    messagesContainer.off('scroll.loadMore'); 
-
-    const allMessages = [
-        ...(contact.app_data?.[app]?.messages || []),
-        ...PhoneSim_State.stagedPlayerMessages.filter(msg => msg.contactId === cId).map(m => m.tempMessageObject)
-    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    await _renderMessages(messagesContainer, allMessages, isGroup);
-
-    messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
-    triggerPendingAnimations(cId);
+    const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     
-    messagesContainer.on('scroll.loadMore', UI.throttle(async function() {
-        if (isLoadingMore) return;
-        if (messagesContainer.scrollTop() <= 5 && displayedMessageCount < allMessages.length) {
-            isLoadingMore = true;
-            const oldScrollHeight = messagesContainer[0].scrollHeight;
-
-            displayedMessageCount += LOAD_MORE_COUNT;
-            await _renderMessages(messagesContainer, allMessages, isGroup, false);
-            
-            const newScrollHeight = messagesContainer[0].scrollHeight;
-            messagesContainer.scrollTop(newScrollHeight - oldScrollHeight);
-            isLoadingMore = false;
-        }
-    }, 200));
+    const stickerHtml = stickers.map(sticker => `
+        <div class="sticker-item" data-file="${sticker.file}" data-name="${sticker.name}" title="${sticker.name}">
+            <img src="${placeholderSrc}" data-src="https://files.catbox.moe/${sticker.file}" alt="${sticker.name}">
+        </div>
+    `).join('');
+    
+    grid.html(stickerHtml);
 }

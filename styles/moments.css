@@ -1,3 +1,14 @@
+
+@keyframes phone-sim-v14-like-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); color: #ff5252; }
+    100% { transform: scale(1); }
+}
+
+#phone-sim-panel-v10-0 .moment-actions .action-btn.like-btn.popped i {
+    animation: phone-sim-v14-like-pop 0.3s ease-out;
+}
+
 /* Moments View */
 #phone-sim-panel-v10-0 .moment-header { display: flex; justify-content: space-between; align-items: flex-start; }
 #phone-sim-panel-v10-0 .moment-actions-trigger { cursor: pointer; color: #888; padding: 0 5px; }

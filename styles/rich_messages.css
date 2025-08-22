@@ -55,10 +55,10 @@
 /* Pseudo Image */
 #phone-sim-panel-v10-0 .pseudo-image-message .pseudo-image-cover { padding: 10px 14px; background: #fff; border: 1px solid #e0e2e7; border-radius: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: #555; }
 #phone-sim-panel-v10-0 .pseudo-image-message .pseudo-image-cover i { color: #888; }
-#phone-sim-panel-v10-0 .pseudo-image-text { padding: 10px 14px; background: #fff; border: 1px solid #e0e2e7; border-radius: 12px; display: none; }
+#phone-sim-panel-v10-0 .pseudo-image-message .pseudo-image-text { padding: 10px 14px; background: #fff; border: 1px solid #e0e2e7; border-radius: 12px; display: none; }
 
 /* Transfer & Red Packet */
-#phone-sim-panel-v10-0 .rich-message.transfer-message { padding: 12px; border-radius: 8px; width: 220px; color: #fff; }
+#phone-sim-panel-v10-0 .rich-message.transfer-message { padding: 12px; border-radius: 8px; max-width: 220px; box-sizing: border-box; color: #fff; }
 #phone-sim-panel-v10-0 .rich-message.transfer-message.unclaimed { cursor: pointer; }
 #phone-sim-panel-v10-0 .rich-message.transfer-message.transfer.unclaimed { background-color: #FA9D3B; }
 #phone-sim-panel-v10-0 .rich-message.transfer-message.red_packet.unclaimed { background-color: #e64340; }

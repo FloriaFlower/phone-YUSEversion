@@ -1,3 +1,5 @@
+
+
 import { PhoneSim_State } from '../state.js';
 
 let jQuery_API, parentWin, UI, DataHandler;
@@ -33,16 +35,17 @@ export function renderHistoryAndBookmarks() {
     const historyList = jQuery_API(parentWin.document.body).find('#history-list').empty();
     const bookmarksList = jQuery_API(parentWin.document.body).find('#bookmarks-list').empty();
     const directoryList = jQuery_API(parentWin.document.body).find('#directory-list').empty();
+    const persistentHistory = PhoneSim_State.persistentBrowserHistory;
 
-    // Render History
-    if (PhoneSim_State.browserHistory.length === 0) {
+    // Render History from the persistent log
+    if (!persistentHistory || persistentHistory.length === 0) {
         historyList.html('<div class="hb-list-empty">无历史记录</div>');
     } else {
         const uniqueUrls = new Set();
-        [...PhoneSim_State.browserHistory].reverse().forEach(url => {
+        [...persistentHistory].reverse().forEach(url => {
             if(uniqueUrls.has(url)) return;
             const item = PhoneSim_State.browserData[url];
-            if (!item || !item.timestamp) return;
+            if (!item) return; 
             
             uniqueUrls.add(url);
             const itemHtml = `
@@ -131,10 +134,9 @@ export function renderWebpage(contentBlocks) {
     }
 
     contentBlocks.forEach(block => {
-        const { type, text } = block; // 'text' is now pre-processed by the parser into a string or array
+        const { type, text } = block;
         if (!type) return;
 
-        // Use the new generic rich content renderer, treating content as non-interactive (like a moment)
         const processedHtml = UI.renderRichContent(text, { isMoment: true });
         
         const allowedTags = ['h1', 'h2', 'p', 'blockquote'];
@@ -150,12 +152,14 @@ export function renderWebpage(contentBlocks) {
 
 export function updateNavControls() {
     const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const currentUrl = PhoneSim_State.browserHistory[PhoneSim_State.browserHistoryIndex];
+    
+    // Back button is now always enabled within the browser app. Its function is determined by the event handler.
     p.find('#browser-back-btn').prop('disabled', false);
 
     const bookmarkBtn = p.find('#browser-bookmark-toggle-btn');
     const bookmarkIcon = bookmarkBtn.find('i');
     
-    const currentUrl = PhoneSim_State.browserHistory[PhoneSim_State.browserHistoryIndex];
     if (currentUrl && !currentUrl.startsWith('search://')) {
         bookmarkBtn.prop('disabled', false);
         if (DataHandler.isBookmarked(currentUrl)) {
@@ -223,6 +227,4 @@ export function setLoading(isLoading) {
             showBrowserSubview('webpage');
         }
     }
-    // No 'else' block needed, as the content areas are cleared and repopulated
-    // by their respective render functions when new data arrives.
 }

@@ -18,8 +18,24 @@ export const PhoneSim_Sounds = {
         this._sounds[name].preload = 'auto';
     },
     
+    _vibrate: function(duration = 5) {
+        if (navigator.vibrate && !state.customization.isMuted) {
+            try {
+                navigator.vibrate(duration);
+            } catch (e) {
+                // This can fail on some browsers/devices, but it's not critical.
+            }
+        }
+    },
+
     play: function(name) {
+        const soundsWithHaptics = ['tap', 'send', 'open', 'close', 'toggle'];
+        if (soundsWithHaptics.includes(name)) {
+            this._vibrate();
+        }
+        
         if (!state || state.customization.isMuted) return;
+
         const sound = this._sounds[name];
         if (sound) {
             sound.currentTime = 0;
