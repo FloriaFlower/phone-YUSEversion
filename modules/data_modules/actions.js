@@ -282,6 +282,12 @@ export async function commitStagedActions() {
                 case 'delete_forum_reply':
                     textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
                     break;
+                case 'new_danmaku':
+                    const stream = DataHandler.findLiveStreamById(action.streamerId);
+                    if (stream) {
+                        textPrompt += `- 在${stream.streamerName}的直播间发送了弹幕：“${action.content}”\\n`;
+                    }
+                    break;
             }
         });
         textPrompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
@@ -445,6 +451,16 @@ export async function saveContactAvatar(contactId, base64data) {
     }
 }
 
+export async function updateContactNote(contactId, newNote) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        const contact = dbData[contactId];
+        if (contact && contact.profile) {
+            contact.profile.note = newNote;
+        }
+        return dbData;
+    });
+}
+
 
 // --- MESSAGE ACTION FUNCTIONS ---
 export function findMessageByUid(messageUid, dbData = null) {
@@ -460,6 +476,20 @@ export function findMessageByUid(messageUid, dbData = null) {
         if (messages) {
             const msg = messages.find(msg => msg.uid === messageUid);
             if (msg) return msg;
+        }
+    }
+    return null;
+}
+
+export function findMomentCommentByUid(commentUid) {
+    for (const moment of PhoneSim_State.moments) {
+        const comment = moment.comments?.find(c => c.uid === commentUid);
+        if (comment) return comment;
+    }
+    // Also check staged actions
+    for (const action of PhoneSim_State.stagedPlayerActions) {
+        if (action.type === 'comment' && action.commentId === commentUid) {
+            return { uid: action.commentId, commenterId: PhoneSim_Config.PLAYER_ID, text: action.content, isStaged: true };
         }
     }
     return null;

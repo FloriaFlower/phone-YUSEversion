@@ -134,6 +134,25 @@ export function addEventListeners() {
     const sendForumReply = () => { const input = p.find('.forum-reply-input'); const content = input.val().trim(); if (content && PhoneSim_State.activeForumPostId) { PhoneSim_Sounds.play('send'); DataHandler.stagePlayerAction({ type: 'new_forum_reply', postId: PhoneSim_State.activeForumPostId, content: content, replyId: 'staged_reply_' + Date.now() }); input.val(''); } };
     p.on('click.phonesim', '.forum-reply-send-btn', sendForumReply);
     p.on('keypress.phonesim', '.forum-reply-input', function(e) { if (e.key === 'Enter') { sendForumReply(); } });
+    const sendDanmaku = () => {
+        const input = p.find('.stream-danmaku-input');
+        const content = input.val().trim();
+        if (content && PhoneSim_State.activeLiveStreamId) {
+            PhoneSim_Sounds.play('send');
+            DataHandler.stagePlayerAction({
+                type: 'new_danmaku',
+                streamerId: PhoneSim_State.activeLiveStreamId,
+                content: content
+            });
+            input.val('');
+        }
+    };
+    p.on('click.phonesim', '.stream-danmaku-send-btn', sendDanmaku);
+    p.on('keypress.phonesim', '.stream-danmaku-input', function(e) {
+        if (e.key === 'Enter') {
+            sendDanmaku();
+        }
+    });
     p.on('click.phonesim', '.post-like-btn', function() { PhoneSim_Sounds.play('tap'); const postId = jQuery_API(this).data('post-id'); DataHandler.stagePlayerAction({ type: 'like_forum_post', postId }); });
     
     // --- SETTINGS APP (FIXED) ---
@@ -365,6 +384,42 @@ export function addEventListeners() {
             case 'send-transfer': { const amount = await UI.showDialog('输入转账金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'transfer', amount: parseFloat(amount).toFixed(2), note: '转账', status: 'claimed' }, null, `[转账：${amount}]`); return; }
             case 'send-red-packet': { const amount = await UI.showDialog('输入红包金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'red_packet', amount: parseFloat(amount).toFixed(2), note: '恭喜发财，大吉大利', status: 'claimed' }, null, `[红包：${amount}]`); return; }
             case 'send-location': { const loc = await UI.showDialog('输入位置'); if (loc) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'location', text: loc }, null, `[位置：${loc}]`); return; }
+            case 'edit_moment': {
+                const moment = PhoneSim_State.moments.find(m => m.momentId === momentId);
+                if (moment) {
+                    const newContent = await UI.showDialog('修改动态', typeof moment.content === 'string' ? moment.content : '');
+                    if (newContent !== null) {
+                        DataHandler.stagePlayerAction({ type: 'edit_moment', momentId, content: newContent });
+                    }
+                }
+                return;
+            }
+            case 'delete_moment': {
+                if (await SillyTavern_API.callGenericPopup('确定删除此动态吗?', 'confirm')) {
+                    DataHandler.stagePlayerAction({ type: 'delete_moment', momentId });
+                }
+                return;
+            }
+            case 'edit_comment': {
+                const comment = DataHandler.findMomentCommentByUid(commentId);
+                if (comment) {
+                    const newContent = await UI.showDialog('修改评论', typeof comment.text === 'string' ? comment.text : '');
+                    if (newContent !== null) {
+                        DataHandler.stagePlayerAction({ type: 'edit_comment', momentId, commentId, content: newContent });
+                    }
+                }
+                return;
+            }
+            case 'recall_comment': {
+                DataHandler.stagePlayerAction({ type: 'recall_comment', momentId, commentId });
+                return;
+            }
+            case 'delete_comment': {
+                if (await SillyTavern_API.callGenericPopup('确定删除此评论吗?', 'confirm')) {
+                    DataHandler.stagePlayerAction({ type: 'delete_comment', momentId, commentId });
+                }
+                return;
+            }
         }
 
         if (messageUid) {
