@@ -10,6 +10,35 @@ export function init(deps, uiHandler) {
     UI = uiHandler;
 }
 
+const PRESET_FORUM_BOARDS = {
+    "campus_life": "校园生活",
+    "academic_exchange": "学术交流"
+};
+
+const PRESET_LIVE_BOARDS = {
+    "hot_games": { name: "热门游戏" },
+    "music_station": { name: "音乐台" },
+    "life_chat": { name: "生活闲聊" }
+};
+
+export function getBoardNameById(boardId, context) {
+    if (context === 'forum') {
+        if (PRESET_FORUM_BOARDS[boardId]) {
+            return PRESET_FORUM_BOARDS[boardId];
+        }
+        return PhoneSim_State.forumData[boardId]?.boardName || boardId;
+    }
+    if (context === 'live') {
+        if (PRESET_LIVE_BOARDS[boardId]) {
+            return PRESET_LIVE_BOARDS[boardId].name;
+        }
+        // Custom live boards are not a feature, but this is a safe fallback
+        return PhoneSim_State.liveCenterData[boardId]?.boardName || boardId;
+    }
+    return boardId; // Fallback
+}
+
+
 async function fetchAllDirectoryAndRequests() {
     const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
     if (!lorebookName) {

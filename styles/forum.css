@@ -56,6 +56,9 @@
 #phone-sim-panel-v10-0 .forum-item-actions .fa-chevron-right { color: #ccc; }
 #phone-sim-panel-v10-0 .forum-item-actions .generate-content-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #888; padding: 8px; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
 #phone-sim-panel-v10-0 .forum-item-actions .generate-content-btn:hover { background-color: #e9e9e9; color: #333; }
+#phone-sim-panel-v10-0 .forum-item-actions .delete-board-btn { background: none; border: none; cursor: pointer; font-size: 14px; color: #aaa; padding: 8px; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; transition: all .2s; opacity: 0; }
+#phone-sim-panel-v10-0 .forum-board-item:hover .forum-item-actions .delete-board-btn { opacity: 1; }
+#phone-sim-panel-v10-0 .forum-item-actions .delete-board-btn:hover { background-color: #fbe2e2; color: #d9534f; }
 
 
 /* Post List */

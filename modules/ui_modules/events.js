@@ -47,7 +47,7 @@ export function addEventListeners() {
             if (richMediaPanel.is(':visible') && !target.closest('.rich-media-panel, .emoji-btn').length) {
                 richMediaPanel.hide();
             }
-             if (!target.closest('.phone-sim-menu, #chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .message-actions, .moment-actions-trigger, .forum-actions-trigger, .rich-message.transfer-message.unclaimed, .rich-media-btn').length) {
+             if (!target.closest('.phone-sim-menu, #chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .message-actions, .moment-actions-trigger, .forum-actions-trigger, .rich-message.transfer-message.unclaimed, .rich-media-btn, #manage-forum-btn, #manage-livecenter-btn').length) {
                 p.find('.phone-sim-menu').hide();
             }
              if (p.find('#phone-sim-moments-notify-modal').is(':visible') && !target.closest('.phone-sim-notify-modal-content').length) {
@@ -83,7 +83,7 @@ export function addEventListeners() {
             UI.renderContactsView();
         }
     });
-    p.on('click.phonesim', '#emailapp-view .email-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('EmailDetail', jQuery_API(this).data('id')); });
+    p.on('click.phonesim', '.email-item', function(e) { if(jQuery_API(e.target).closest('.delete-item-btn').length) return; PhoneSim_Sounds.play('tap'); UI.showView('EmailDetail', jQuery_API(this).data('id')); });
     p.on('click.phonesim', '.phoneapp-bottom-nav .nav-item', function() { const item = jQuery_API(this); if (item.hasClass('active')) return; PhoneSim_Sounds.play('tap'); const target = item.data('target'); p.find('.phoneapp-bottom-nav .nav-item').removeClass('active'); item.addClass('active'); const wrapper = p.find('#phoneapp-view .subview-wrapper'); wrapper.find('.subview').removeClass('active'); wrapper.find(`.phone-${target}-subview`).addClass('active'); PhoneSim_State.activeSubviews.phoneapp = target; PhoneSim_State.saveUiState(); });
     const dialerDisplay = p.find('.dialer-display');
     p.on('click.phonesim', '.dial-key', function() { PhoneSim_Sounds.play('tap'); dialerDisplay.val(dialerDisplay.val() + jQuery_API(this).data('key')); });
@@ -91,6 +91,9 @@ export function addEventListeners() {
     p.on('click.phonesim', '.dial-call-btn', function() { PhoneSim_Sounds.play('open'); const number = dialerDisplay.val(); if (!number) return; const contact = Object.entries(PhoneSim_State.contacts).find(([id, c]) => id === number); const callTarget = contact ? { id: contact[0], name: contact[1].profile.note || contact[1].profile.nickname } : { id: number, name: number }; DataHandler.initiatePhoneCall(callTarget); });
     p.on('click.phonesim', '#emaildetail-view .reply-button', async function() { PhoneSim_Sounds.play('tap'); const senderName = jQuery_API(this).data('sender-name'); const replyContent = await UI.showDialog(`回复 ${senderName}`); if (replyContent) { const prompt = `(系统提示：{{user}}回复了${senderName}的邮件：“${replyContent}”)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); UI.showView('EmailApp'); } });
     p.on('click.phonesim', '#emaildetail-view .accept-button', async function() { PhoneSim_Sounds.play('open'); const emailId = PhoneSim_State.activeEmailId; const email = PhoneSim_State.emails.find(e => e.id === emailId); if (email && email.attachment) { const prompt = `(系统提示：{{user}}收下了邮件“${email.subject}”中的附件“${email.attachment.name}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); SillyTavern_API.callGenericPopup(`已收下附件：${email.attachment.name}`, 'text'); } });
+    p.on('click.phonesim', '#emailapp-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(jQuery_API(this).closest('.email-item').data('id')); UI.renderEmailList(); } });
+    p.on('click.phonesim', '#phonecall-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_API.callGenericPopup('确定删除这条通话记录吗？', 'confirm')) { await DataHandler.deleteCallLogByTimestamp(jQuery_API(this).closest('.call-log-item').data('id')); UI.renderCallLogView(); } });
+    p.on('click.phonesim', '#emaildetail-view #delete-email-btn', async function() { if (await SillyTavern_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(PhoneSim_State.activeEmailId); UI.showView('EmailApp'); }});
     
     // --- BROWSER APP (DELEGATED EVENTS) ---
     p.on('click.phonesim', '#browser-back-btn', () => DataHandler.browserGoBack());
@@ -109,11 +112,15 @@ export function addEventListeners() {
     p.on('click.phonesim', '.webpage-content a[data-download="true"]', (e) => { e.preventDefault(); const link = jQuery_API(e.target); SillyTavern_API.callGenericPopup(`<b>文件下载</b><br><br><b>文件名:</b> ${link.attr('href')}<br><b>描述:</b> ${link.data('description')}<br><br><i>(此功能为模拟，不会实际下载文件)</i>`, 'text'); });
     
     // --- FORUM & LIVE CENTER APPS ---
-    p.on('click.phonesim', '#new-forum-content-btn, #new-live-content-btn, #new-forum-post-btn, #new-live-stream-btn', function() {
+    p.on('click.phonesim', '#new-forum-content-btn, #new-live-content-btn, #new-live-stream-btn', function() {
         PhoneSim_Sounds.play('tap');
         const id = jQuery_API(this).attr('id');
         const context = (id.includes('forum')) ? 'forum' : 'live';
         UI.showView('Creation', { context: context });
+    });
+    p.on('click.phonesim', '#new-forum-post-btn', function() {
+        PhoneSim_Sounds.play('tap');
+        UI.showView('Creation', { context: 'forum', boardId: PhoneSim_State.activeForumBoardId });
     });
     p.on('click.phonesim', '#creation-back-btn', function() {
         PhoneSim_Sounds.play('tap');
@@ -133,15 +140,32 @@ export function addEventListeners() {
         }
 
         if (context === 'forum') {
-            DataHandler.stagePlayerAction({ type: 'new_forum_post', postId: `staged_post_${Date.now()}`, boardName: board, title: title, content: content });
+            DataHandler.stagePlayerAction({ type: 'new_forum_post', postId: `staged_post_${Date.now()}`, boardName: board, boardId: PhoneSim_State.creationBoardContext, title: title, content: content });
             UI.showView('ForumApp');
         } else if (context === 'live') {
-            DataHandler.stagePlayerAction({ type: 'new_live_stream', streamId: `staged_stream_${Date.now()}`, boardName: board, title: title, content: content });
+            DataHandler.stagePlayerAction({ type: 'new_live_stream', streamId: `staged_stream_${Date.now()}`, boardName: board, boardId: PhoneSim_State.creationBoardContext, title: title, content: content });
             UI.showView('LiveCenterApp');
         }
     });
 
-    p.on('click.phonesim', '.forum-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('ForumPostList', jQuery_API(this).data('board-id')); });
+    p.on('click.phonesim', '.forum-board-item', function(e) { 
+        if (jQuery_API(e.target).closest('.delete-board-btn').length) return;
+        PhoneSim_Sounds.play('tap'); 
+        UI.showView('ForumPostList', jQuery_API(this).data('board-id')); 
+    });
+    p.on('click.phonesim', '.delete-board-btn', async function(e) {
+        e.stopPropagation();
+        PhoneSim_Sounds.play('tap');
+        const item = jQuery_API(this).closest('.forum-board-item');
+        const boardId = item.data('board-id');
+        const boardName = item.data('board-name');
+        
+        if (await SillyTavern_API.callGenericPopup(`确定要删除“${boardName}”板块及其所有帖子吗？此操作不可逆。`, 'confirm')) {
+            await DataHandler.deleteForumBoard(boardId);
+            UI.renderForumBoardList();
+        }
+    });
+
     p.on('click.phonesim', '.forum-post-item', function() { PhoneSim_Sounds.play('open'); UI.showView('ForumPostDetail', jQuery_API(this).data('post-id')); });
     p.on('click.phonesim', '.live-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('LiveStreamList', jQuery_API(this).data('board-id')); });
     p.on('click.phonesim', '.live-stream-item', async function() { PhoneSim_Sounds.play('open'); const streamerId = String(jQuery_API(this).data('streamer-id')); UI.showView('LiveStreamRoom', streamerId); const stream = DataHandler.findLiveStreamById(streamerId); if (stream) { const prompt = `(系统提示：{{user}}进入了 ${stream.streamerName} 的直播间“${stream.title}”，请生成当前的直播内容和弹幕。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } else { console.error(`[Phone Sim] Could not find stream data for streamerId: ${streamerId}`); } });
@@ -309,7 +333,7 @@ export function addEventListeners() {
     p.on('click.phonesim', '.voice-message', function(){ PhoneSim_Sounds.play('tap'); jQuery_API(this).toggleClass('expanded'); });
     p.on('click.phonesim', '.edit-note-btn', function() { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeContactId) { const contact = PhoneSim_State.contacts[PhoneSim_State.activeContactId]; if (!contact || !contact.profile) return; UI.showDialog('设置备注', contact.profile.note || contact.profile.nickname || '').then(n => { if (n !== null) DataHandler.updateContactNote(PhoneSim_State.activeContactId, n).then(() => DataHandler.fetchAllData()); }); } });
     p.on('click.phonesim', '.call-btn', () => { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeContactId) DataHandler.initiateVoiceCall(PhoneSim_State.activeContactId); });
-    p.on('click.phonesim', '#chatconversation-view .header-avatar', function() {
+    p.on('click.phonesim', '#chatconversation-view .header-avatar.clickable-avatar', function() {
         PhoneSim_Sounds.play('tap');
         const contactId = PhoneSim_State.activeContactId;
         if (contactId) {
@@ -366,7 +390,7 @@ export function addEventListeners() {
 
 
     // --- MENU HANDLER ---
-    p.on('click.phonesim', '#chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .message-actions, .moment-actions-trigger, .forum-actions-trigger, .rich-message.transfer-message.unclaimed, .rich-media-btn', function(e){
+    p.on('click.phonesim', '#chat-list-actions-btn, #add-chat-btn, #moments-actions-btn, .message-actions, .moment-actions-trigger, .forum-actions-trigger, .rich-message.transfer-message.unclaimed, .rich-media-btn, #manage-forum-btn, #manage-livecenter-btn', function(e){
         e.stopPropagation();
         PhoneSim_Sounds.play('tap');
         const clickedElement = jQuery_API(this);
@@ -376,11 +400,19 @@ export function addEventListeners() {
         if (clickedElement.is('#chat-list-actions-btn')) menuId = '#manage-chats-menu';
         else if (clickedElement.is('#add-chat-btn')) menuId = '#add-chat-menu';
         else if (clickedElement.is('#moments-actions-btn')) menuId = '#manage-moments-menu';
+        else if (clickedElement.is('#manage-forum-btn')) menuId = '#manage-forum-menu';
+        else if (clickedElement.is('#manage-livecenter-btn')) menuId = '#manage-livecenter-menu';
         else if (clickedElement.hasClass('rich-media-btn')) menuId = '#rich-media-actions-menu';
         else if (clickedElement.hasClass('message-actions')) { const message = DataHandler.findMessageByUid(clickedElement.data('message-uid')); if (message) { menuId = (message.sender_id === PhoneSim_Config.PLAYER_ID) ? '#message-actions-menu' : '#npc-message-actions-menu'; } }
         else if (clickedElement.hasClass('rich-message')) { menuId = '#transfer-actions-menu'; }
         else if (clickedElement.hasClass('moment-actions-trigger')) { menuId = clickedElement.data('poster-id') == PhoneSim_Config.PLAYER_ID ? '#player-moment-actions-menu' : '#npc-moment-actions-menu'; }
-        else if (clickedElement.hasClass('forum-actions-trigger')) { menuId = clickedElement.data('reply-id') ? '#forum-reply-actions-menu' : '#forum-post-actions-menu'; }
+        else if (clickedElement.hasClass('forum-actions-trigger')) {
+            const authorId = clickedElement.data('author-id');
+            const isPlayer = String(authorId) === PhoneSim_Config.PLAYER_ID;
+            const isReply = clickedElement.data('reply-id');
+            if(isReply) { menuId = isPlayer ? '#player-forum-reply-actions-menu' : '#npc-forum-reply-actions-menu'; }
+            else { menuId = isPlayer ? '#player-forum-post-actions-menu' : '#npc-forum-post-actions-menu'; }
+        }
         
         if (!menuId) return;
 
@@ -392,30 +424,17 @@ export function addEventListeners() {
         const menuHeight = menu.outerHeight();
         const menuWidth = menu.outerWidth();
         
-        // Vertical positioning
-        let top = (buttonRect.top - panelRect.top) + clickedElement.outerHeight() + 5; // Default: open downwards
+        let top = (buttonRect.top - panelRect.top) + clickedElement.outerHeight() + 5;
         if (top + menuHeight > panelRect.height - 5) {
-            // Not enough space below, open upwards
             top = (buttonRect.top - panelRect.top) - menuHeight - 5;
         }
 
-        // Horizontal positioning
-        let left;
-        const isSentMessageAction = clickedElement.hasClass('message-actions') && clickedElement.closest('.message').hasClass('sent');
-
-        if (isSentMessageAction) {
-            // For sent messages (player), the '...' is on the left of the bubble. Open menu to the right.
+        let left = (buttonRect.left - panelRect.left) - menuWidth + clickedElement.outerWidth();
+        if (clickedElement.hasClass('message-actions') && clickedElement.closest('.message').hasClass('sent')) {
             left = (buttonRect.left - panelRect.left);
-        } else {
-            // Default: Align right edge of menu with right edge of button.
-            left = (buttonRect.left - panelRect.left) - menuWidth + clickedElement.outerWidth();
         }
-
-        // Boundary checks
         if (left < 5) left = 5;
-        if (left + menuWidth > panelRect.width - 5) {
-            left = panelRect.width - menuWidth - 5;
-        }
+        if (left + menuWidth > panelRect.width - 5) { left = panelRect.width - menuWidth - 5; }
         
         menu.data(clickedElement.data()).css({ top: `${top}px`, left: `${left}px` }).toggle();
     });
@@ -439,6 +458,8 @@ export function addEventListeners() {
             case 'start-group-chat': UI.showView('GroupCreation'); return;
             case 'clear_all_history': if(await SillyTavern_API.callGenericPopup('确定清空所有聊天记录吗？', 'confirm')) { await DataHandler.clearAllChatHistory(); await DataHandler.fetchAllData(); UI.renderContactsList(); } return;
             case 'clear_all_moments': if(await SillyTavern_API.callGenericPopup('确定清空所有动态吗？', 'confirm')) { await DataHandler.clearAllMoments(); await DataHandler.fetchAllData(); if (p.find('#moments-view').hasClass('active')) UI.renderMomentsView(); } return;
+            case 'clear_all_forum_data': if(await SillyTavern_API.callGenericPopup('确定清空所有论坛数据吗？', 'confirm')) { await DataHandler.clearAllForumData(); } return;
+            case 'clear_all_live_data': if(await SillyTavern_API.callGenericPopup('确定清空所有直播数据吗？', 'confirm')) { await DataHandler.clearAllLiveData(); } return;
             case 'accept': if (uid) { DataHandler.stagePlayerAction({ type: 'accept_transaction', uid: uid }); } return;
             case 'ignore': return;
             case 'upload-local-image': UI.handleFileUpload('localImageUpload', PhoneSim_State.activeContactId); return;
@@ -495,6 +516,38 @@ export function addEventListeners() {
             case 'delete_comment': {
                 if (await SillyTavern_API.callGenericPopup('确定删除此评论吗?', 'confirm')) {
                     DataHandler.stagePlayerAction({ type: 'delete_comment', momentId, commentId });
+                }
+                return;
+            }
+            case 'edit_forum_post': {
+                const post = DataHandler.findForumPostById(postId);
+                if (post) {
+                    const newContent = await UI.showDialog('修改帖子', typeof post.content === 'string' ? post.content : '');
+                    if (newContent !== null) {
+                        DataHandler.stagePlayerAction({ type: 'edit_forum_post', postId, content: newContent });
+                    }
+                }
+                return;
+            }
+            case 'delete_forum_post': {
+                if (await SillyTavern_API.callGenericPopup('确定删除此帖子吗?', 'confirm')) {
+                    DataHandler.stagePlayerAction({ type: 'delete_forum_post', postId });
+                }
+                return;
+            }
+            case 'edit_forum_reply': {
+                const reply = DataHandler.findForumReplyById(replyId);
+                 if (reply) {
+                    const newContent = await UI.showDialog('修改回复', typeof reply.content === 'string' ? reply.content : '');
+                    if (newContent !== null) {
+                        DataHandler.stagePlayerAction({ type: 'edit_forum_reply', replyId, content: newContent });
+                    }
+                }
+                return;
+            }
+            case 'delete_forum_reply': {
+                 if (await SillyTavern_API.callGenericPopup('确定删除此回复吗?', 'confirm')) {
+                    DataHandler.stagePlayerAction({ type: 'delete_forum_reply', replyId });
                 }
                 return;
             }

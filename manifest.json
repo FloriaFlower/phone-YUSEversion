@@ -2,8 +2,8 @@
 {
     "display_name": "手机模拟器",
     "author": "Feature Update",
-    "version": "17.0",
-    "description": "v17.0 [功能更新] 新增“直播中心”应用，支持AI模拟直播板块、列表和直播间内容。为论坛和直播中心添加了前端实时搜索功能。",
+    "version": "17.1",
+    "description": "v17.1 [功能更新] 新增“直播中心”应用，支持AI模拟直播板块、列表和直播间内容。为论坛和直播中心添加了前端实时搜索功能。",
     "loading_order": 100,
     "js": "script.js",
     "css": "style.css",

@@ -4,6 +4,7 @@ import { PhoneSim_Sounds } from '../sounds.js';
 import { PhoneSim_Parser } from '../parser.js';
 
 let jQuery_API, parentWin, UI, DataHandler;
+let notificationTimeoutId; // Hold the timeout ID for the notification banner
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
@@ -269,6 +270,9 @@ export function showNotificationBanner(contact, message) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let banner = p.find('#phone-sim-notification-banner');
 
+    clearTimeout(notificationTimeoutId);
+    banner.removeClass('show');
+
     const isGroup = contact.id?.startsWith('group_');
     const name = isGroup ? contact.profile.groupName : (contact.profile.note || contact.profile.nickname);
     const avatar = contact.profile.avatar || UI.generateDefaultAvatar(name);
@@ -279,10 +283,14 @@ export function showNotificationBanner(contact, message) {
         else preview = '[富文本消息]';
     }
 
-    banner.html(`<div class="notification-content"><img src="${avatar}" class="notification-avatar"/><div class="notification-text"><h4>${name}</h4><p>${jQuery_API('<div>').text(preview).html()}</p></div></div>`);
-    banner.addClass('show');
-    setTimeout(() => banner.removeClass('show'), 4000);
+    const bannerContent = `<div class="notification-content"><img src="${avatar}" class="notification-avatar"/><div class="notification-text"><h4>${name}</h4><p>${jQuery_API('<div>').text(preview).html()}</p></div></div>`;
+    
+    setTimeout(() => {
+        banner.html(bannerContent).addClass('show');
+        notificationTimeoutId = setTimeout(() => banner.removeClass('show'), 4000);
+    }, 50);
 }
+
 
 export function updateCommitButton() {
     const btn = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.COMMIT_BUTTON_ID}`);

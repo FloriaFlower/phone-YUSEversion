@@ -36,7 +36,7 @@
 #phone-sim-panel-v10-0 .phone-contact-delete-btn:hover { background: #ffcdd2; }
 
 /* Call Log */
-#phone-sim-panel-v10-0 .call-log-item { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; gap: 12px; }
+#phone-sim-panel-v10-0 .call-log-item { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; gap: 12px; position: relative; }
 #phone-sim-panel-v10-0 .call-log-icon { width: 24px; text-align: center; color: #888; }
 #phone-sim-panel-v10-0 .call-log-info { flex-grow: 1; }
 #phone-sim-panel-v10-0 .call-log-name { font-size: 15px; font-weight: 500; }
@@ -57,7 +57,7 @@
 #phone-sim-panel-v10-0 .dial-call-btn { width: 60px; height: 60px; border-radius: 50%; background: #4caf50; color: white; border: none; font-size: 24px; cursor: pointer; }
 
 /* Email App */
-#phone-sim-panel-v10-0 .email-item { display:flex; align-items:center; padding:10px 16px; border-bottom:1px solid #f0f0f0; cursor:pointer; }
+#phone-sim-panel-v10-0 .email-item { display:flex; align-items:center; padding:10px 16px; border-bottom:1px solid #f0f0f0; cursor:pointer; position: relative; }
 #phone-sim-panel-v10-0 .email-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px; flex-shrink: 0; }
 #phone-sim-panel-v10-0 .email-detail-subview { background: #fef6f6; }
 #phone-sim-panel-v10-0 .email-detail-scroll-content { flex: 1; overflow-y: auto; }
@@ -78,3 +78,9 @@
 #phone-sim-panel-v10-0 .email-actions { padding: 10px 16px; display: flex; gap: 12px; justify-content: center; background: #ffebeb; border-top: 1px solid #ffd1d1; }
 #phone-sim-panel-v10-0 .action-button { padding: 8px 20px; border: none; border-radius: 16px; background: linear-gradient(145deg, #ff7b7b, #ff5252); color: white; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 3px 10px rgba(255,107,107,0.3); }
 #phone-sim-panel-v10-0 .action-button:hover { transform: translateY(-2px); }
+
+/* Unified Delete Button for Lists */
+#phone-sim-panel-v10-0 .delete-item-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #aaa; border-radius: 50%; transition: all .2s ease; opacity: 0; cursor: pointer; }
+#phone-sim-panel-v10-0 .email-item:hover .delete-item-btn,
+#phone-sim-panel-v10-0 .call-log-item:hover .delete-item-btn { opacity: 1; }
+#phone-sim-panel-v10-0 .delete-item-btn:hover { background: rgba(0,0,0,0.1); color: #f44336; }

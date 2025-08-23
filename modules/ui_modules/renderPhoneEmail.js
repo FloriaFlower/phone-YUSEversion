@@ -1,4 +1,5 @@
 
+
 import { PhoneSim_State } from '../state.js';
 
 let jQuery_API, parentWin, UI, DataHandler;
@@ -46,7 +47,7 @@ export function renderCallLogView() {
             : '<i class="fas fa-phone-alt"></i>';
 
         const itemHtml = `
-            <div class="call-log-item">
+            <div class="call-log-item" data-id="${log.timestamp}">
                 <div class="call-log-icon">
                     <i class="fas fa-arrow-left" style="color: #07c160;"></i>
                 </div>
@@ -60,6 +61,7 @@ export function renderCallLogView() {
                 <div class="call-log-time">
                     ${new Date(log.timestamp).toLocaleDateString()}
                 </div>
+                 <div class="delete-item-btn" title="删除记录"><i class="fas fa-trash-alt"></i></div>
             </div>
         `;
         list.append(itemHtml);
@@ -77,20 +79,38 @@ export function renderEmailList() {
     emails.forEach(email => {
         const sender = PhoneSim_State.contacts[email.from_id] || { profile: { nickname: email.from_name } };
         const avatar = sender.profile.avatar || UI.generateDefaultAvatar(email.from_name);
-        emailList.append(`<div class="email-item ${!email.read ? 'unread' : ''}" data-id="${email.id}"><img src="${avatar}" class="email-avatar"/><div class="email-info"><div class="email-sender">${email.from_name}</div><div class="email-subject">${email.subject}</div><div class="email-preview">${(email.content || '').substring(0, 50)}...</div></div><div class="email-time">${new Date(email.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>`);
+        const itemHtml = `
+            <div class="email-item ${!email.read ? 'unread' : ''}" data-id="${email.id}">
+                <img src="${avatar}" class="email-avatar"/>
+                <div class="email-info">
+                    <div class="email-sender">${email.from_name}</div>
+                    <div class="email-subject">${email.subject}</div>
+                    <div class="email-preview">${(email.content || '').substring(0, 50)}...</div>
+                </div>
+                <div class="email-time">${new Date(email.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+                <div class="delete-item-btn" title="删除邮件"><i class="fas fa-trash-alt"></i></div>
+            </div>`;
+        emailList.append(itemHtml);
     });
 }
 
 export function renderEmailDetail(emailId) {
     const detailView = jQuery_API(parentWin.document.body).find('#emaildetail-view');
+    const header = detailView.find('.app-header');
     const scrollContent = detailView.find('.email-detail-scroll-content').empty();
     const actions = detailView.find('.email-actions').empty();
 
     const email = PhoneSim_State.emails.find(e => e.id === emailId);
     if (!email) {
         scrollContent.html('<div>邮件未找到</div>');
+        header.find('#delete-email-btn').remove();
         return;
     }
+    
+    if (header.find('#delete-email-btn').length === 0) {
+        header.append('<div class="header-actions" id="delete-email-btn" title="删除邮件"><i class="fas fa-trash"></i></div>');
+    }
+
 
     if (!email.read) {
         (async () => {

@@ -84,11 +84,11 @@ export function renderForumBoardList() {
             const board = forumData[boardId];
             const icon = boardIcons["default"];
              const itemHtml = `
-                <div class="forum-board-item" data-board-id="${boardId}">
+                <div class="forum-board-item" data-board-id="${boardId}" data-board-name="${board.boardName}">
                     <i class="fas ${icon} forum-board-icon"></i>
                     <span class="forum-board-name">${board.boardName}</span>
                     <div class="forum-item-actions">
-                        <button class="generate-content-btn" data-type="forum" data-board-id="${boardId}" data-board-name="${board.boardName}" title="生成新内容"><i class="fas fa-plus"></i></button>
+                        <button class="delete-board-btn" title="删除板块"><i class="fas fa-trash-alt"></i></button>
                         <i class="fas fa-chevron-right"></i>
                     </div>
                 </div>
@@ -105,7 +105,7 @@ export async function renderForumPostList(boardId) {
     const content = view.find('.forum-post-list-content').empty();
     
     const boardData = PhoneSim_State.forumData[boardId];
-    const posts = boardData?.posts || [];
+    let posts = boardData?.posts || [];
     
     const stagedPosts = PhoneSim_State.stagedPlayerActions
         .filter(a => a.type === 'new_forum_post' && (a.boardId === boardId || a.boardName === boardName))
@@ -119,7 +119,10 @@ export async function renderForumPostList(boardId) {
             likes: [],
             isStaged: true
         }));
-    
+        
+    const deletedPostIds = new Set(PhoneSim_State.stagedPlayerActions.filter(a => a.type === 'delete_forum_post').map(a => a.postId));
+    posts = posts.filter(p => !deletedPostIds.has(p.postId));
+
     const allPosts = [...stagedPosts, ...posts].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     if (allPosts.length === 0) {
@@ -159,16 +162,27 @@ export function renderForumPostDetail(postId) {
     const content = view.find('.forum-post-detail-content').empty();
     const postFromState = DataHandler.findForumPostById(postId);
 
-    // If post is not found, render skeleton and exit. This prevents "post not found" error.
     if (!postFromState) {
         content.html(getPostDetailSkeleton());
         return;
     }
+    
+    if (PhoneSim_State.stagedPlayerActions.some(a => a.type === 'delete_forum_post' && a.postId === postId)) {
+        content.html('<p style="text-align:center; padding: 20px;">帖子已被删除。</p>');
+        return;
+    }
 
-    // Create a deep copy for optimistic updates
     const post = JSON.parse(JSON.stringify(postFromState));
 
-    // --- Optimistic Updates ---
+    PhoneSim_State.stagedPlayerActions.forEach(action => {
+        if (action.postId === postId) {
+            if (action.type === 'edit_forum_post') {
+                post.content = action.content;
+                post.isStaged = true;
+            }
+        }
+    });
+    
     const stagedReplies = PhoneSim_State.stagedPlayerActions
         .filter(a => a.type === 'new_forum_reply' && a.postId === postId)
         .map(a => ({
@@ -180,7 +194,6 @@ export function renderForumPostDetail(postId) {
             isStaged: true
         }));
     
-    // Optimistically add likes
     if (PhoneSim_State.stagedPlayerActions.some(a => a.type === 'like_forum_post' && a.postId === postId)) {
         if (!post.likes) post.likes = [];
         if (!post.likes.includes(PhoneSim_Config.PLAYER_ID)) {
@@ -188,14 +201,26 @@ export function renderForumPostDetail(postId) {
         }
     }
     
-    const allReplies = [...(post.replies || []), ...stagedReplies].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const deletedReplyIds = new Set(PhoneSim_State.stagedPlayerActions.filter(a => a.type === 'delete_forum_reply').map(a => a.replyId));
+    let finalReplies = (post.replies || []).filter(r => !deletedReplyIds.has(r.replyId));
+
+    PhoneSim_State.stagedPlayerActions.forEach(action => {
+        if(action.type === 'edit_forum_reply') {
+            const reply = finalReplies.find(r => r.replyId === action.replyId);
+            if(reply) {
+                reply.content = action.content;
+                reply.isStaged = true;
+            }
+        }
+    });
+    
+    const allReplies = [...stagedReplies, ...finalReplies].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     const authorName = UI._getContactName(post.authorId);
     const authorAvatar = UI.generateDefaultAvatar(authorName);
     const postBodyHtml = UI.renderRichContent(post.content);
 
-    const isPlayerPost = post.authorId === PhoneSim_Config.PLAYER_ID;
-    const actionsTriggerHtml = isPlayerPost ? `<div class="forum-actions-trigger" data-post-id="${post.postId}"><i class="fas fa-ellipsis-h"></i></div>` : '';
+    const actionsTriggerHtml = `<div class="forum-actions-trigger" data-author-id="${post.authorId}" data-post-id="${post.postId}"><i class="fas fa-ellipsis-h"></i></div>`;
 
     let tagsHtml = '';
     if (post.tags && Array.isArray(post.tags) && post.tags.length > 0) {
@@ -238,8 +263,7 @@ export function renderForumPostDetail(postId) {
         allReplies.forEach(reply => {
             const replyAuthorName = UI._getContactName(reply.authorId);
             const replyAuthorAvatar = UI.generateDefaultAvatar(replyAuthorName);
-            const isPlayerReply = reply.authorId === PhoneSim_Config.PLAYER_ID;
-            const replyActionsHtml = isPlayerReply ? `<div class="forum-actions-trigger" data-reply-id="${reply.replyId}"><i class="fas fa-ellipsis-h"></i></div>` : '';
+            const replyActionsHtml = `<div class="forum-actions-trigger" data-author-id="${reply.authorId}" data-reply-id="${reply.replyId}"><i class="fas fa-ellipsis-h"></i></div>`;
             
             const replyHtml = `
                 <div class="post-reply-item ${reply.isStaged ? 'staged' : ''}" data-reply-id="${reply.replyId}">
