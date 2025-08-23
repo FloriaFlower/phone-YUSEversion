@@ -19,7 +19,14 @@ export function renderPhoneContactList() {
     for (const [id, c] of sortedContacts) {
         const name = c.profile.note || c.profile.nickname;
         const avatar = c.profile.avatar || UI.generateDefaultAvatar(name);
-        list.append(`<div class="phone-contact-item" data-id="${id}"><img src="${avatar}" class="phone-contact-avatar clickable-avatar" data-contact-id="${id}"><span class="phone-contact-name clickable-avatar" data-contact-id="${id}">${name}</span><div class="phone-contact-call-btn"><i class="fas fa-phone"></i></div></div>`);
+        const itemHtml = `
+            <div class="phone-contact-item" data-id="${id}">
+                <img src="${avatar}" class="phone-contact-avatar clickable-avatar" data-contact-id="${id}">
+                <span class="phone-contact-name clickable-avatar" data-contact-id="${id}">${name}</span>
+                <div class="phone-contact-delete-btn" data-id="${id}" title="删除联系人"><i class="fas fa-trash-alt"></i></div>
+                <div class="phone-contact-call-btn"><i class="fas fa-phone"></i></div>
+            </div>`;
+        list.append(itemHtml);
     }
 }
 

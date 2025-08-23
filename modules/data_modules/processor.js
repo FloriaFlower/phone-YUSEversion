@@ -1,4 +1,5 @@
 
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -49,8 +50,12 @@ async function _handleNewEmailCommand(cmd, msgId) {
 }
 
 async function _handleForumCommands(commands, msgId) {
+    const newPosts = commands.filter(c => c.type === '新帖子');
+    const newReplies = commands.filter(c => c.type === '新回复');
+    const postUpdates = commands.filter(c => c.type === '更新帖子');
+
     await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumDb => {
-        // First, remove existing data from this message ID to prevent duplication on edit
+        // First, remove any existing data from this message ID to prevent duplication on edit
         for (const boardId in forumDb) {
             const board = forumDb[boardId];
             if (board.posts) {
@@ -63,67 +68,81 @@ async function _handleForumCommands(commands, msgId) {
             }
         }
 
-        // Then, add the new commands
-        commands.forEach(cmd => {
+        // Process all new posts first, adding them to the database structure
+        newPosts.forEach(cmd => {
             const data = cmd.data;
-            if (cmd.type === '新帖子') {
-                const boardId = data.boardId;
-                if (!forumDb[boardId]) {
-                    forumDb[boardId] = { boardName: data.boardName, posts: [] };
-                }
-                const newPost = {
-                    postId: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    boardId: data.boardId,
-                    authorId: data.authorId,
-                    authorName: data.authorName,
-                    title: data.title,
-                    content: data.content,
-                    timestamp: PhoneSim_Parser.buildTimestamp(data.time),
-                    tags: data.tags || [],
-                    replies: [],
-                    likes: [],
-                    sourceMsgId: msgId
-                };
-                forumDb[boardId].posts.push(newPost);
-            } else if (cmd.type === '新回复') {
-                const { postId } = data;
-                let postFound = false;
-                for (const boardId in forumDb) {
-                    const postIndex = forumDb[boardId].posts.findIndex(p => p.postId === postId);
-                    if (postIndex > -1) {
-                        const newReply = {
-                            replyId: `reply_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                            postId: postId,
-                            authorId: data.authorId,
-                            authorName: data.authorName,
-                            content: data.content,
-                            timestamp: PhoneSim_Parser.buildTimestamp(data.time),
-                            sourceMsgId: msgId
-                        };
-                        forumDb[boardId].posts[postIndex].replies.push(newReply);
-                        postFound = true;
-                        break;
-                    }
-                }
-                if (!postFound) console.warn(`[Phone Sim] Forum post with ID ${postId} not found for reply.`);
-            } else if (cmd.type === '更新帖子') {
-                const { postId, action, actorId } = data;
-                const post = Object.values(forumDb).flatMap(b => b.posts).find(p => p.postId === postId);
+            const postId = data.postId || `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const boardId = data.boardId || data.boardName.toLowerCase().replace(/\s/g, '_');
+            if (!forumDb[boardId]) {
+                forumDb[boardId] = { boardName: data.boardName, posts: [] };
+            }
+            const newPost = {
+                postId: postId,
+                boardId: boardId,
+                authorId: data.authorId,
+                authorName: data.authorName,
+                title: data.title,
+                content: data.content,
+                timestamp: PhoneSim_Parser.buildTimestamp(data.time),
+                tags: data.tags || [],
+                replies: [],
+                likes: data.likes || [],
+                sourceMsgId: msgId
+            };
+            forumDb[boardId].posts.push(newPost);
+        });
+
+        // Then, process all new replies against the potentially just-updated database
+        newReplies.forEach(cmd => {
+            const data = cmd.data;
+            const { postId } = data;
+            let postFound = false;
+            for (const boardId in forumDb) {
+                const post = forumDb[boardId].posts.find(p => p.postId === postId);
                 if (post) {
-                    if (action === 'like') {
-                        if (!post.likes) post.likes = [];
-                        if (!post.likes.includes(actorId)) {
-                            post.likes.push(actorId);
-                        }
-                    }
-                } else {
-                    console.warn(`[Phone Sim] Forum post with ID ${postId} not found for update.`);
+                    if (!post.replies) post.replies = [];
+                    const newReply = {
+                        replyId: `reply_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        postId: postId,
+                        authorId: data.authorId,
+                        authorName: data.authorName,
+                        content: data.content,
+                        timestamp: PhoneSim_Parser.buildTimestamp(data.time),
+                        sourceMsgId: msgId
+                    };
+                    post.replies.push(newReply);
+                    postFound = true;
+                    break;
                 }
             }
+            if (!postFound) console.warn(`[Phone Sim] Forum post with ID ${postId} not found for reply.`);
         });
+        
+        // Finally, process all post updates (likes)
+        postUpdates.forEach(cmd => {
+             const data = cmd.data;
+             const { postId, action, actorId } = data;
+             let postFound = false;
+             for (const boardId in forumDb) {
+                 const post = forumDb[boardId].posts.find(p => p.postId === postId);
+                 if (post) {
+                     if (action === 'like') {
+                         if (!post.likes) post.likes = [];
+                         if (!post.likes.includes(actorId)) {
+                             post.likes.push(actorId);
+                         }
+                     }
+                     postFound = true;
+                     break;
+                 }
+             }
+             if (!postFound) console.warn(`[Phone Sim] Forum post with ID ${postId} not found for update.`);
+        });
+
         return forumDb;
     });
 }
+
 
 async function _handleLiveCenterCommands(commands, msgId) {
      await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, liveDb => {

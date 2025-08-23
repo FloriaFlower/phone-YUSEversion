@@ -144,6 +144,9 @@ export function renderRichContent(content, context = {}) {
                                         <div class="location-subtitle">收到的地理位置</div>
                                     </div>
                                 </div>`;
+            case 'call_end':
+                const icon = '<i class="fas fa-phone"></i>';
+                return `<div class="call-end-bubble">${icon}<span>通话时长 ${sanitize(content.duration)}</span></div>`;
             default: return `<div>[未知格式消息]</div>`;
         }
     }

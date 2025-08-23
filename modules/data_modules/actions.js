@@ -1,3 +1,5 @@
+
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -86,7 +88,7 @@ export async function addWeChatCallEndMessage(contactId, duration) {
             const endMessage = {
                 uid: `call_end_${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                isSystemNotification: true,
+                sender_id: PhoneSim_Config.PLAYER_ID, // An action from the player
                 content: {
                     type: 'call_end',
                     duration: duration
@@ -96,6 +98,21 @@ export async function addWeChatCallEndMessage(contactId, duration) {
         }
         return dbData;
     });
+}
+
+export async function initiateVoiceCall(contactId) {
+    const contactName = UI._getContactName(contactId);
+    const prompt = `(系统提示：{{user}}向${contactName}发起了微信语音通话...)`;
+    await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+    SillyTavern_API.generate();
+}
+
+export async function initiatePhoneCall(callTarget) {
+    const prompt = `(系统提示：{{user}}正在呼叫${callTarget.name}的电话...)`;
+    await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+    SillyTavern_API.generate();
+    UI.closeCallUI();
+    UI.showView('PhoneApp');
 }
 
 
@@ -170,194 +187,207 @@ export async function commitStagedActions() {
     const playerActionsToCommit = [...PhoneSim_State.stagedPlayerActions];
     if (messagesToCommit.length === 0 && playerActionsToCommit.length === 0) return;
 
-    // Separate image messages from text messages
-    const textMessages = messagesToCommit.filter(msg => msg.content?.type !== 'local_image');
-    const imageMessages = messagesToCommit.filter(msg => msg.content?.type === 'local_image');
-    
-    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
-    let hasTextActions = false;
-
-    // Process text messages and player actions into a single prompt
-    const textMessagesToPersist = [];
-    if (textMessages.length > 0 || playerActionsToCommit.length > 0) {
-        hasTextActions = true;
-        textMessages.forEach(msg => {
-            const contact = PhoneSim_State.contacts[msg.contactId];
-            if (!contact) return;
-            const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
-            const contentForAI = msg.descriptionForAI || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
-            
-            if (msg.tempMessageObject.replyingTo) {
-                const originalMsg = DataHandler.findMessageByUid(msg.tempMessageObject.replyingTo);
-                const originalSender = originalMsg ? UI._getContactName(originalMsg.sender_id) : '某人';
-                textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中回复了${originalSender}的消息，并发送：“${contentForAI}”\\n`;
-            } else {
-                textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中发送消息：“${contentForAI}”\\n`;
-            }
-            
-            const finalMessage = { ...msg.tempMessageObject };
-            delete finalMessage.isStaged;
-            finalMessage.sourceMsgId = null;
-            textMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
-        });
-
-        playerActionsToCommit.forEach(action => {
-            const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-            const poster = moment ? PhoneSim_State.contacts[moment.posterId] : null;
-            const posterName = poster?.profile.note || poster?.profile.nickname || moment?.posterId;
-            const group = PhoneSim_State.contacts[action.groupId];
-            const groupName = group?.profile.groupName || action.groupId;
-
-            switch(action.type) {
-                case 'accept_transaction':
-                    const transactionMsg = DataHandler.findMessageByUid(action.uid);
-                    if (transactionMsg) {
-                        const senderName = UI._getContactName(transactionMsg.sender_id);
-                        const typeText = transactionMsg.content.type === 'red_packet' ? '红包' : '转账';
-                        textPrompt += `- 接收了${senderName}的${typeText}。\\n`;
-                    }
-                    break;
-                case 'create_group':
-                    const memberNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
-                    textPrompt += `- 创建了群聊“${action.groupName}”，并邀请了${memberNames}加入。\\n`;
-                    break;
-                case 'kick_member':
-                    const memberName = UI._getContactName(action.memberId);
-                    textPrompt += `- 在群聊“${groupName}”中将“${memberName}”移出群聊。\\n`;
-                    break;
-                case 'invite_members':
-                    const invitedNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
-                    textPrompt += `- 在群聊“${groupName}”中邀请了${invitedNames}加入群聊。\\n`;
-                    break;
-                case 'new_moment':
-                    textPrompt += `- 发表了新动态：“${action.data.content}”` + (action.data.images?.length > 0 ? ' [附图片]' : '') + `\\n`;
-                    break;
-                case 'like':
-                    if (moment) textPrompt += `- 点赞了${posterName}的动态\\n`;
-                    break;
-                case 'comment':
-                     if (moment) textPrompt += `- 评论了${posterName}的动态：“${action.content}”\\n`;
-                    break;
-                case 'edit_comment':
-                     if (moment) textPrompt += `- 修改了对${posterName}动态的评论为：“${action.content}”\\n`;
-                    break;
-                case 'recall_comment':
-                     if (moment) textPrompt += `- 撤回了对${posterName}动态的一条评论\\n`;
-                    break;
-                case 'delete_comment':
-                     if (moment) textPrompt += `- 删除了对${posterName}动态的一条评论\\n`;
-                    break;
-                case 'edit_moment':
-                    if (moment) textPrompt += `- 修改了动态：“${action.content}”\\n`;
-                    break;
-                case 'delete_moment':
-                    if (moment) textPrompt += `- 删除了${posterName}发布的动态\\n`;
-                    break;
-                case 'friend_request_response':
-                    const responseText = action.action === 'accept' ? '接受了' : '忽略了';
-                    textPrompt += `- ${responseText}${action.from_name}的好友请求\\n`;
-                    break;
-                case 'new_forum_post':
-                    textPrompt += `- 在论坛“${action.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
-                    break;
-                case 'new_live_stream':
-                    textPrompt += `- 在直播中心“${action.boardName}”板块创建了新的直播间，标题为“${action.title}”，直播简介为“${action.content}”\\n`;
-                    break;
-                case 'new_forum_reply':
-                    const post = DataHandler.findForumPostById(action.postId);
-                    if (post) {
-                        const postAuthorName = UI._getContactName(post.authorId);
-                        textPrompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
-                    }
-                    break;
-                case 'like_forum_post':
-                    const likedPost = DataHandler.findForumPostById(action.postId);
-                    if (likedPost) {
-                         textPrompt += `- 点赞了${UI._getContactName(likedPost.authorId)}的论坛帖子“${likedPost.title}”\\n`;
-                    }
-                    break;
-                case 'delete_forum_post':
-                    textPrompt += `- 删除了自己在论坛发表的帖子\\n`;
-                    break;
-                case 'delete_forum_reply':
-                    textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
-                    break;
-                case 'new_danmaku':
-                    const stream = DataHandler.findLiveStreamById(action.streamerId);
-                    if (stream) {
-                        textPrompt += `- 在${stream.streamerName}的直播间发送了弹幕：“${action.content}”\\n`;
-                    }
-                    break;
-            }
-        });
-        textPrompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
-    }
-
     PhoneSim_State.stagedPlayerMessages = [];
     PhoneSim_State.stagedPlayerActions = [];
+    UI.updateCommitButton();
+
+    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
+    let hasActionsForAI = false;
     
-    // Send text-based actions first
-    if (hasTextActions) {
+    const finalMessagesToPersist = [];
+    
+    messagesToCommit.forEach(msg => {
+        hasActionsForAI = true;
+        const contact = PhoneSim_State.contacts[msg.contactId];
+        if (!contact) return;
+
+        const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
+        const contentForAI = msg.descriptionForAI || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
+        
+        if (msg.tempMessageObject.replyingTo) {
+            const originalMsg = DataHandler.findMessageByUid(msg.tempMessageObject.replyingTo);
+            const originalSender = originalMsg ? UI._getContactName(originalMsg.sender_id) : '某人';
+            textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中回复了${originalSender}的消息，并发送：“${contentForAI}”\\n`;
+        } else {
+            textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中发送消息：“${contentForAI}”\\n`;
+        }
+        
+        const finalMessage = { ...msg.tempMessageObject };
+        delete finalMessage.isStaged;
+        finalMessage.sourceMsgId = null; 
+        finalMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
+    });
+
+    playerActionsToCommit.forEach(action => {
+        hasActionsForAI = true;
+        const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
+        const poster = moment ? PhoneSim_State.contacts[moment.posterId] : null;
+        const posterName = poster?.profile.note || poster?.profile.nickname || moment?.posterId;
+        const group = PhoneSim_State.contacts[action.groupId];
+        const groupName = group?.profile.groupName || action.groupId;
+
+        switch(action.type) {
+            case 'accept_transaction':
+                const transactionMsg = DataHandler.findMessageByUid(action.uid);
+                if (transactionMsg) {
+                    const senderName = UI._getContactName(transactionMsg.sender_id);
+                    const typeText = transactionMsg.content.type === 'red_packet' ? '红包' : '转账';
+                    textPrompt += `- 接收了${senderName}的${typeText}。\\n`;
+                }
+                break;
+            case 'create_group':
+                const memberNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
+                textPrompt += `- 创建了群聊“${action.groupName}”，并邀请了${memberNames}加入。\\n`;
+                break;
+            case 'kick_member':
+                const memberName = UI._getContactName(action.memberId);
+                textPrompt += `- 在群聊“${groupName}”中将“${memberName}”移出群聊。\\n`;
+                break;
+            case 'invite_members':
+                const invitedNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
+                textPrompt += `- 在群聊“${groupName}”中邀请了${invitedNames}加入群聊。\\n`;
+                break;
+            case 'new_moment':
+                textPrompt += `- 发表了新动态：“${action.data.content}”` + (action.data.images?.length > 0 ? ' [附图片]' : '') + `\\n`;
+                break;
+            case 'like':
+                if (moment) textPrompt += `- 点赞了${posterName}的动态\\n`;
+                break;
+            case 'comment':
+                 if (moment) textPrompt += `- 评论了${posterName}的动态：“${action.content}”\\n`;
+                break;
+            case 'edit_comment':
+                 if (moment) textPrompt += `- 修改了对${posterName}动态的评论为：“${action.content}”\\n`;
+                break;
+            case 'recall_comment':
+                 if (moment) textPrompt += `- 撤回了对${posterName}动态的一条评论\\n`;
+                break;
+            case 'delete_comment':
+                 if (moment) textPrompt += `- 删除了对${posterName}动态的一条评论\\n`;
+                break;
+            case 'edit_moment':
+                if (moment) textPrompt += `- 修改了动态：“${action.content}”\\n`;
+                break;
+            case 'delete_moment':
+                if (moment) textPrompt += `- 删除了${posterName}发布的动态\\n`;
+                break;
+            case 'friend_request_response':
+                const responseText = action.action === 'accept' ? '接受了' : '忽略了';
+                textPrompt += `- ${responseText}${action.from_name}的好友请求\\n`;
+                break;
+            case 'new_forum_post':
+                textPrompt += `- 在论坛“${action.boardName}”板块发表了新帖子，标题为“${action.title}”，内容为“${action.content}”\\n`;
+                break;
+            case 'new_live_stream':
+                textPrompt += `- 在直播中心“${action.boardName}”板块创建了新的直播间，标题为“${action.title}”，直播简介为“${action.content}”\\n`;
+                break;
+            case 'new_forum_reply':
+                const post = DataHandler.findForumPostById(action.postId);
+                if (post) {
+                    const postAuthorName = UI._getContactName(post.authorId);
+                    textPrompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
+                }
+                break;
+            case 'like_forum_post':
+                const likedPost = DataHandler.findForumPostById(action.postId);
+                if (likedPost) {
+                     textPrompt += `- 点赞了${UI._getContactName(likedPost.authorId)}的论坛帖子“${likedPost.title}”\\n`;
+                }
+                break;
+            case 'delete_forum_post':
+                textPrompt += `- 删除了自己在论坛发表的帖子\\n`;
+                break;
+            case 'delete_forum_reply':
+                textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
+                break;
+            case 'new_danmaku':
+                const stream = DataHandler.findLiveStreamById(action.streamerId);
+                if (stream) {
+                    textPrompt += `- 在${stream.streamerName}的直播间发送了弹幕：“${action.content}”\\n`;
+                }
+                break;
+        }
+    });
+
+    textPrompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
+
+    // --- Data Persistence Stage ---
+    
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        finalMessagesToPersist.forEach(item => {
+            const contactObject = dbData[item.contactId];
+            if (contactObject?.app_data?.WeChat) {
+                if (!contactObject.app_data.WeChat.messages) contactObject.app_data.WeChat.messages = [];
+                contactObject.app_data.WeChat.messages.push(item.message);
+            }
+        });
+        
+        // Persist non-forum/live actions here
+        // ... (moments, groups, etc. logic)
+
+        return dbData;
+    });
+
+    const forumActions = playerActionsToCommit.filter(a => a.type.includes('forum'));
+    if (forumActions.length > 0) {
+        await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumDb => {
+            forumActions.forEach(action => {
+                 if (action.type === 'new_forum_post') {
+                    const boardId = action.boardName.toLowerCase().replace(/\s/g, '_');
+                    if (!forumDb[boardId]) {
+                        forumDb[boardId] = { boardName: action.boardName, posts: [] };
+                    }
+                    const newPost = {
+                        postId: action.postId, boardId: boardId, authorId: PhoneSim_Config.PLAYER_ID,
+                        authorName: PhoneSim_State.customization.playerNickname || '我', title: action.title,
+                        content: action.content, timestamp: new Date().toISOString(), replies: [], likes: [],
+                    };
+                    forumDb[boardId].posts.push(newPost);
+                } else if (action.type === 'new_forum_reply') {
+                    for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                        if (post) {
+                            if (!post.replies) post.replies = [];
+                            post.replies.push({
+                                replyId: action.replyId, postId: action.postId, authorId: PhoneSim_Config.PLAYER_ID,
+                                authorName: PhoneSim_State.customization.playerNickname || '我', content: action.content,
+                                timestamp: new Date().toISOString()
+                            });
+                            break;
+                        }
+                    }
+                } else if (action.type === 'like_forum_post') {
+                     for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                         if (post) {
+                             if (!post.likes) post.likes = [];
+                             if (!post.likes.includes(PhoneSim_Config.PLAYER_ID)) {
+                                 post.likes.push(PhoneSim_Config.PLAYER_ID);
+                             }
+                             break;
+                         }
+                     }
+                }
+            });
+            return forumDb;
+        });
+    }
+
+    // --- AI Generation Stage ---
+    if (hasActionsForAI) {
         try {
             await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
             SillyTavern_API.generate();
         } catch (error) {
             console.error('[Phone Sim] Failed to commit text actions:', error);
-            // Restore relevant staged actions on failure
-            PhoneSim_State.stagedPlayerMessages = textMessages;
-            PhoneSim_State.stagedPlayerActions = playerActionsToCommit;
-            return; // Stop processing
         }
     }
 
-    // Send image-based actions separately
-    const imageMessagesToPersist = [];
-    for (const msg of imageMessages) {
-        const contact = PhoneSim_State.contacts[msg.contactId];
-        if (!contact) continue;
-        const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
-        const imagePrompt = `(系统提示：{{user}}在与${contactName}的聊天中发送了一张图片。请描述你看到了什么，并作出回应。)`;
-        
-        try {
-            await TavernHelper_API.generate({ user_input: imagePrompt, image: msg.content.base64 });
-
-            // On success, prepare a lightweight placeholder for saving
-            const finalMessage = { ...msg.tempMessageObject };
-            delete finalMessage.isStaged;
-            finalMessage.sourceMsgId = null;
-            // IMPORTANT: Replace large base64 with a small placeholder for worldbook
-            finalMessage.content = { type: 'pseudo_image', text: '[图片] 发送了一张图片' };
-            imageMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
-
-        } catch (error) {
-            console.error('[Phone Sim] Failed to commit image action:', error);
-            // Restore this specific image message on failure
-            PhoneSim_State.stagedPlayerMessages.push(msg);
-        }
-    }
-
-    // Persist changes after successful API calls
-    const allMessagesToPersist = [...textMessagesToPersist, ...imageMessagesToPersist];
-    if (allMessagesToPersist.length > 0) {
-        await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-            allMessagesToPersist.forEach(item => {
-                const contactObject = dbData[item.contactId];
-                if (contactObject?.app_data?.WeChat) {
-                    contactObject.app_data.WeChat.messages.push(item.message);
-                }
-            });
-            return dbData;
-        });
-    }
-
-    if (playerActionsToCommit.length > 0) {
-        // ... (The rest of the persistence logic for actions remains the same)
-    }
-    
+    // --- FINAL UI REFRESH STAGE ---
     await DataHandler.fetchAllData();
-    UI.updateCommitButton();
-    UI.rerenderCurrentView({ chatUpdated: true, momentsUpdated: true, forumUpdated: true });
+    UI.rerenderCurrentView({ forceRerender: true });
 }
+
 
 export function saveCustomization() {
     try {
@@ -563,4 +593,53 @@ export async function markEmailAsRead(emailId) {
         }
         return emails;
     });
+}
+
+export async function clearChatHistoryForContact(contactId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        const contact = dbData[contactId];
+        if (contact && contact.app_data && contact.app_data.WeChat) {
+            contact.app_data.WeChat.messages = [];
+            contact.unread = 0;
+        }
+        return dbData;
+    });
+}
+
+export async function deleteContact(contactId) {
+    // 1. Delete from main DB
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        if (dbData[contactId]) {
+            delete dbData[contactId];
+        }
+        // Also remove from any groups
+        Object.keys(dbData).forEach(id => {
+            if (id.startsWith('group_') && dbData[id].profile?.members) {
+                dbData[id].profile.members = dbData[id].profile.members.filter(memberId => memberId !== contactId);
+            }
+        });
+        return dbData;
+    });
+
+    // 2. Delete from directory
+    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+        if (dirData.contacts) {
+            for (const name in dirData.contacts) {
+                if (dirData.contacts[name] === contactId) {
+                    delete dirData.contacts[name];
+                }
+            }
+        }
+        return dirData;
+    });
+
+    // 3. Delete avatar
+    await _updateWorldbook(PhoneSim_Config.WORLD_AVATAR_DB_NAME, avatarData => {
+        if (avatarData[contactId]) {
+            delete avatarData[contactId];
+        }
+        return avatarData;
+    });
+
+    await DataHandler.fetchAllData();
 }

@@ -8,7 +8,14 @@
         <div id="chatapp-view" class="view" data-nav-level="1">
             <div class="subview-wrapper">
                  <div class="chat-list-subview subview active" data-subview="messages">
-                    <div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>消息</h3><div class="header-actions-group"><div class="header-actions" id="add-chat-btn"><i class="fas fa-plus"></i></div><div class="header-actions" id="chat-list-actions-btn"><i class="fas fa-ellipsis-v"></i></div></div></div>
+                    <div class="app-header">
+                        <button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button>
+                        <h3>消息</h3>
+                        <div class="header-actions-group">
+                            <div class="header-actions" id="add-chat-btn"><i class="fas fa-plus"></i></div>
+                            <div class="header-actions" id="chat-list-actions-btn"><i class="fas fa-ellipsis-v"></i></div>
+                        </div>
+                    </div>
                     <div class="chat-list-content"></div>
                 </div>
                 <div class="contacts-subview subview" data-subview="contacts">
@@ -111,7 +118,16 @@
 
     <!-- Modals and Overlays -->
     <div class="voice-call-modal" style="display:none;"><audio class="voice-call-audio" src="https://files.catbox.moe/k339d2.mp3" loop></audio><div class="caller-avatar-container"><img src="" class="caller-avatar"/></div><div class="caller-name"></div><div class="call-status">微信语音通话...</div><div class="call-buttons"><button class="call-button reject-call"><i class="fas fa-phone"></i></button><button class="call-button accept-call"><i class="fas fa-phone"></i></button></div></div>
-    
+    <div class="phone-sim-modal-overlay" id="phone-sim-moments-notify-modal" style="display:none;">
+        <div class="phone-sim-notify-modal-content">
+            <div class="phone-sim-notify-modal-header">
+                <h3>消息</h3>
+                <button class="phone-sim-notify-close">&times;</button>
+            </div>
+            <div class="phone-sim-notify-list"></div>
+        </div>
+    </div>
+
     <!-- Action Menus -->
     <div class="phone-sim-menu" id="message-actions-menu" style="display:none;"><div class="menu-item" data-action="reply">回复</div><div class="menu-item" data-action="edit">修改</div><div class="menu-item" data-action="recall">撤回</div><div class="menu-item" data-action="delete">删除</div></div>
     <div class="phone-sim-menu" id="npc-message-actions-menu" style="display:none;"><div class="menu-item" data-action="reply">回复</div><div class="menu-item" data-action="delete">删除</div></div>

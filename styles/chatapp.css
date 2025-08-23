@@ -23,9 +23,9 @@
 #phone-sim-panel-v10-0 .chat-list-content{flex-grow:1;overflow-y:auto}
 #phone-sim-panel-v10-0 .chat-list-item{display:flex;align-items:center;padding:12px 16px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.05);background:rgba(255,255,255,.6);backdrop-filter:blur(5px);position:relative;transition:background-color .2s ease}
 #phone-sim-panel-v10-0 .chat-list-item:hover{background:rgba(255,255,255,.8)}
-#phone-sim-panel-v10-0 .delete-contact-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#aaa;border-radius:50%;transition:all .2s ease;opacity:0}
-#phone-sim-panel-v10-0 .chat-list-item:hover .delete-contact-btn{opacity:1;color:#f44336}
-#phone-sim-panel-v10-0 .delete-contact-btn:hover{background:rgba(0,0,0,0.1)}
+#phone-sim-panel-v10-0 .delete-chat-history-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#aaa;border-radius:50%;transition:all .2s ease;opacity:0}
+#phone-sim-panel-v10-0 .chat-list-item:hover .delete-chat-history-btn{opacity:1;color:#f44336}
+#phone-sim-panel-v10-0 .delete-chat-history-btn:hover{background:rgba(0,0,0,0.1)}
 #phone-sim-panel-v10-0 .chat-avatar{width:48px;height:48px;border-radius:50%;margin-right:12px;flex-shrink:0;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.1);object-fit:cover}
 #phone-sim-panel-v10-0 .chat-info{flex:1;min-width:0}
 #phone-sim-panel-v10-0 .chat-header-list{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}

@@ -1,3 +1,4 @@
+
 @keyframes phone-sim-v14-fadeInSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 #phone-sim-toggle-btn-v10-0{
@@ -124,8 +125,7 @@
     box-sizing: border-box;
 }
 #phone-sim-panel-v10-0 .app-header h3{flex-grow:1;text-align:center;margin:0;padding-left:30px;padding-right:30px; font-size: 16px;}
-#phone-sim-panel-v10-0 .app-header .header-actions{cursor:pointer;z-index:10; position: absolute; right: 16px;}
-#phone-sim-panel-v10-0 .moments-header-actions-wrapper { position: absolute; right: 16px; display:flex; gap: 16px; z-index: 10; }
+#phone-sim-panel-v10-0 .app-header .header-actions{cursor:pointer;z-index:10;}
 
 #phone-sim-panel-v10-0 .app-back-btn {
     background: none !important;

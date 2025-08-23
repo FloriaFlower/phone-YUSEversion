@@ -32,6 +32,8 @@
 #phone-sim-panel-v10-0 .phone-contact-name { flex-grow: 1; font-size: 16px; }
 #phone-sim-panel-v10-0 .phone-contact-call-btn { width: 40px; height: 40px; border-radius: 50%; background: #e8f5e9; color: #4caf50; display:flex; align-items:center; justify-content:center; flex-shrink: 0; cursor: pointer; transition: background-color .2s; }
 #phone-sim-panel-v10-0 .phone-contact-call-btn:hover { background: #dcedc8; }
+#phone-sim-panel-v10-0 .phone-contact-delete-btn { width: 40px; height: 40px; border-radius: 50%; background: #ffebee; color: #f44336; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: background-color .2s; }
+#phone-sim-panel-v10-0 .phone-contact-delete-btn:hover { background: #ffcdd2; }
 
 /* Call Log */
 #phone-sim-panel-v10-0 .call-log-item { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; gap: 12px; }

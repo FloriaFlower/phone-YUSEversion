@@ -162,3 +162,63 @@ export function renderMomentsView() {
         timeline.append(post);
     });
 }
+
+export function showMomentsNotificationModal() {
+    const modal = jQuery_API(parentWin.document.body).find('#phone-sim-moments-notify-modal');
+    const list = modal.find('.phone-sim-notify-list').empty();
+    
+    const myMoments = PhoneSim_State.moments.filter(m => m.posterId === PhoneSim_Config.PLAYER_ID);
+    let notifications = [];
+
+    myMoments.forEach(moment => {
+        (moment.likes || []).forEach(likerId => {
+            if (likerId !== PhoneSim_Config.PLAYER_ID) {
+                notifications.push({ type: 'like', actorId: likerId, moment });
+            }
+        });
+        (moment.comments || []).forEach(comment => {
+             if (comment.commenterId !== PhoneSim_Config.PLAYER_ID) {
+                notifications.push({ type: 'comment', comment, actorId: comment.commenterId, moment });
+            }
+        });
+    });
+
+    notifications.sort((a, b) => new Date(b.moment.timestamp) - new Date(a.moment.timestamp));
+
+    if (notifications.length === 0) {
+        list.html('<div class="hb-list-empty" style="padding: 20px; text-align: center; color: #999;">没有新消息</div>');
+    } else {
+        notifications.forEach(noti => {
+            const contact = PhoneSim_State.contacts[noti.actorId];
+            const name = contact?.profile.note || contact?.profile.nickname || '有人';
+            const avatar = contact?.profile.avatar || UI.generateDefaultAvatar(name);
+            let textHtml = '';
+            let quoteHtml = '';
+
+            const momentContentText = typeof noti.moment.content === 'string' ? noti.moment.content.substring(0, 20) + '...' : '[图片]';
+
+            if (noti.type === 'like') {
+                textHtml = `<b>${name}</b> <i class="fas fa-heart" style="color: #ff5252;"></i>`;
+            } else {
+                const commentText = typeof noti.comment.text === 'string' ? noti.comment.text : '[图片]';
+                textHtml = `<b>${name}</b> 评论了: ${jQuery_API('<div>').text(commentText).html()}`;
+            }
+
+            quoteHtml = `<div class="phone-sim-notify-quote">${jQuery_API('<div>').text(momentContentText).html()}</div>`;
+
+            const itemHtml = `
+                <div class="phone-sim-notify-item">
+                    <img src="${avatar}" class="phone-sim-notify-avatar">
+                    <div class="phone-sim-notify-main">
+                        <div class="phone-sim-notify-text">${textHtml}</div>
+                        ${quoteHtml}
+                        <div class="phone-sim-notify-meta">${new Date(noti.moment.timestamp).toLocaleString()}</div>
+                    </div>
+                </div>
+            `;
+            list.append(itemHtml);
+        });
+    }
+    
+    modal.show();
+}

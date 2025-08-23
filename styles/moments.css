@@ -10,6 +10,7 @@
 }
 
 /* Moments View */
+#phone-sim-panel-v10-0 .moments-header-actions-wrapper { position: absolute; right: 16px; display:flex; gap: 16px; z-index: 10; }
 #phone-sim-panel-v10-0 .moment-header { display: flex; justify-content: space-between; align-items: flex-start; }
 #phone-sim-panel-v10-0 .moment-actions-trigger { cursor: pointer; color: #888; padding: 0 5px; }
 #phone-sim-panel-v10-0 .moments-timeline { flex: 1; overflow-y: auto; background: #fff; padding: 10px; min-height: 100px; }
@@ -46,6 +47,7 @@
 #phone-sim-panel-v10-0 .homepage-timeline .moment-post { border: 1px solid #eee; margin: 10px; border-radius: 8px; background: #fff; }
 
 /* Moments Notification Modal */
+#phone-sim-panel-v10-0 #phone-sim-moments-notify-modal { z-index: 10003; }
 #phone-sim-panel-v10-0 #phone-sim-moments-notify-modal .phone-sim-notify-modal-content{background:#fff;border-radius:12px;width:300px;max-height: 80%; display: flex; flex-direction: column; box-shadow:0 5px 20px rgba(0,0,0,0.2);animation:phone-sim-v14-fadeInSlideUp 0.3s ease-out;}
 #phone-sim-panel-v10-0 #phone-sim-moments-notify-modal .phone-sim-notify-modal-header{padding: 12px 16px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;}
 #phone-sim-panel-v10-0 #phone-sim-moments-notify-modal .phone-sim-notify-modal-header h3{margin: 0; font-size: 16px;}

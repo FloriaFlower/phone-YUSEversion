@@ -1,3 +1,5 @@
+
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -126,7 +128,7 @@ export function renderContactsList() {
                     <p class="chat-preview">${jQuery_API('<div>').text(preview).html()}</p>
                 </div>
                 ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
-                <div class="delete-contact-btn" data-id="${id}" title="删除对话"><i class="fas fa-trash-alt"></i></div>
+                <div class="delete-chat-history-btn" data-id="${id}" title="清空聊天记录"><i class="fas fa-trash-alt"></i></div>
             </div>
         `;
         list.append(itemHtml);
@@ -189,7 +191,13 @@ export function renderContactsView() {
     sortedGroupKeys.forEach(key => {
         listContent.append(`<div class="contact-group-header">${key}</div>`);
         groupedContacts[key].forEach(c => {
-            listContent.append(`<div class="contact-item" data-id="${c.id}"><img src="${c.avatar}" class="contact-item-avatar"><span class="contact-item-name">${c.name}</span></div>`);
+            const itemHtml = `
+                <div class="contact-item" data-id="${c.id}">
+                    <img src="${c.avatar}" class="contact-item-avatar">
+                    <span class="contact-item-name">${c.name}</span>
+                    <div class="delete-contact-btn" data-id="${c.id}" title="删除联系人"><i class="fas fa-trash-alt"></i></div>
+                </div>`;
+            listContent.append(itemHtml);
         });
     });
 }
@@ -288,9 +296,12 @@ export async function renderChatView(contactId, app, isAnimated = true) {
 
     chatView.find('.chat-name').text(name);
     chatView.find('.header-avatar').attr('src', avatar).data('contact-id', contactId);
-    chatView.find('.members-btn').toggle(isGroup).data('group-id', contactId);
     chatView.find('.edit-note-btn').toggle(!isGroup);
     chatView.find('.header-status').toggle(!isGroup);
+    
+    // Restore group call functionality by always showing the members button and call button
+    chatView.find('.members-btn').toggle(isGroup).data('group-id', contactId);
+    chatView.find('.call-btn').show();
 
 
     const allMessages = [

@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -228,6 +229,11 @@ export function generateDefaultAvatar(name) {
 export function _getContactName(contactId) {
     if (contactId === PhoneSim_Config.PLAYER_ID) {
         return PhoneSim_State.customization.playerNickname || '我';
+    }
+    // Check for group ID first
+    if (String(contactId).startsWith('group_')) {
+        const group = PhoneSim_State.contacts[contactId];
+        return group?.profile?.groupName || contactId;
     }
     const contact = PhoneSim_State.contacts[contactId];
     if (contact && contact.profile) {

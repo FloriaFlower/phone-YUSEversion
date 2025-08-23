@@ -19,6 +19,18 @@ export function init(deps, dataHandler, uiObject) {
     DataHandler = dataHandler;
 }
 
+function getPostDetailSkeleton() {
+    return `
+    <div class="skeleton-forum-post-detail">
+        <div class="skeleton title"></div>
+        <div class="skeleton meta"></div>
+        <div class="skeleton text"></div>
+        <div class="skeleton text long"></div>
+        <div class="skeleton text"></div>
+        <div class="skeleton text short"></div>
+    </div>`;
+}
+
 function _getSnippetFromRichContent(content) {
     let text = '';
     if (typeof content === 'string') {
@@ -96,7 +108,7 @@ export async function renderForumPostList(boardId) {
     const posts = boardData?.posts || [];
     
     const stagedPosts = PhoneSim_State.stagedPlayerActions
-        .filter(a => a.type === 'new_forum_post' && a.boardName === boardName)
+        .filter(a => a.type === 'new_forum_post' && (a.boardId === boardId || a.boardName === boardName))
         .map(a => ({
             postId: a.postId,
             authorId: PhoneSim_Config.PLAYER_ID,
@@ -145,31 +157,38 @@ export async function renderForumPostList(boardId) {
 export function renderForumPostDetail(postId) {
     const view = jQuery_API(parentWin.document.body).find('#forumpostdetail-view');
     const content = view.find('.forum-post-detail-content').empty();
-    const post = DataHandler.findForumPostById(postId);
+    const postFromState = DataHandler.findForumPostById(postId);
 
-    if (!post) {
-        content.html('<p>帖子未找到。</p>');
+    // If post is not found, render skeleton and exit. This prevents "post not found" error.
+    if (!postFromState) {
+        content.html(getPostDetailSkeleton());
         return;
     }
 
+    // Create a deep copy for optimistic updates
+    const post = JSON.parse(JSON.stringify(postFromState));
+
+    // --- Optimistic Updates ---
     const stagedReplies = PhoneSim_State.stagedPlayerActions
         .filter(a => a.type === 'new_forum_reply' && a.postId === postId)
         .map(a => ({
             replyId: a.replyId,
             authorId: PhoneSim_Config.PLAYER_ID,
+            authorName: PhoneSim_State.customization.playerNickname || '我',
             content: a.content,
             timestamp: new Date().toISOString(),
             isStaged: true
         }));
     
-    let likes = [...(post.likes || [])];
+    // Optimistically add likes
     if (PhoneSim_State.stagedPlayerActions.some(a => a.type === 'like_forum_post' && a.postId === postId)) {
-        if (!likes.includes(PhoneSim_Config.PLAYER_ID)) {
-            likes.push(PhoneSim_Config.PLAYER_ID);
+        if (!post.likes) post.likes = [];
+        if (!post.likes.includes(PhoneSim_Config.PLAYER_ID)) {
+            post.likes.push(PhoneSim_Config.PLAYER_ID);
         }
     }
     
-    const allReplies = [...stagedReplies, ...(post.replies || [])].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const allReplies = [...(post.replies || []), ...stagedReplies].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     const authorName = UI._getContactName(post.authorId);
     const authorAvatar = UI.generateDefaultAvatar(authorName);
@@ -178,12 +197,20 @@ export function renderForumPostDetail(postId) {
     const isPlayerPost = post.authorId === PhoneSim_Config.PLAYER_ID;
     const actionsTriggerHtml = isPlayerPost ? `<div class="forum-actions-trigger" data-post-id="${post.postId}"><i class="fas fa-ellipsis-h"></i></div>` : '';
 
+    let tagsHtml = '';
+    if (post.tags && Array.isArray(post.tags) && post.tags.length > 0) {
+        tagsHtml = `<div class="post-detail-tags">
+            ${post.tags.map(tag => `<span>${jQuery_API('<div>').text(tag).html()}</span>`).join('')}
+        </div>`;
+    }
+
     const postHtml = `
         <div class="post-main-content">
             <div class="post-detail-header">
                 <h3 class="post-detail-title">${post.title}</h3>
                 ${actionsTriggerHtml}
             </div>
+            ${tagsHtml}
             <div class="post-detail-author-info">
                 <img src="${authorAvatar}" class="post-detail-author-avatar">
                 <div>
@@ -193,9 +220,9 @@ export function renderForumPostDetail(postId) {
             </div>
             <div class="post-detail-body">${postBodyHtml}</div>
             <div class="post-actions-bar">
-                <button class="post-like-btn ${likes.includes(PhoneSim_Config.PLAYER_ID) ? 'liked' : ''}" data-post-id="${postId}">
+                <button class="post-like-btn ${post.likes.includes(PhoneSim_Config.PLAYER_ID) ? 'liked' : ''}" data-post-id="${postId}">
                     <i class="fas fa-thumbs-up"></i>
-                    <span>${likes.length}</span>
+                    <span>${post.likes.length}</span>
                 </button>
             </div>
         </div>
