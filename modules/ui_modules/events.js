@@ -1,15 +1,13 @@
-
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
 
-let jQuery_API, parentWin, SillyTavern_API, TavernHelper_API, UI, DataHandler;
+let jQuery_API, parentWin, SillyTavern_Context_API, TavernHelper_API, UI, DataHandler;
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
-    SillyTavern_API = deps.st;
+    SillyTavern_Context_API = deps.st_context;
     TavernHelper_API = deps.th;
     UI = uiObject;
     DataHandler = dataHandler;
@@ -53,7 +51,7 @@ export function addEventListeners() {
              if (p.find('#phone-sim-moments-notify-modal').is(':visible') && !target.closest('.phone-sim-notify-modal-content').length) {
                 p.find('#phone-sim-moments-notify-modal').hide();
             }
-        } else {
+        } else { // If click is outside the panel, close everything
             p.find('.phone-sim-menu, .rich-media-panel, #phone-sim-moments-notify-modal').hide();
         }
     });
@@ -74,12 +72,11 @@ export function addEventListeners() {
     p.on('click.phonesim', '.phone-contact-delete-btn', async function(e) {
         e.stopPropagation();
         PhoneSim_Sounds.play('tap');
-        const id = jQuery_API(this).data('id');
+        const id = jQuery_API(this).closest('.phone-contact-item').data('id');
         const contactName = jQuery_API(this).siblings('.phone-contact-name').text();
-        if (await SillyTavern_API.callGenericPopup(`确定删除联系人 ${contactName} 吗? 这将一并删除所有聊天记录。`, 'confirm')) {
+        if (await SillyTavern_Context_API.callGenericPopup(`确定删除联系人 ${contactName} 吗? 这将一并删除所有聊天记录。`, 'confirm')) {
             await DataHandler.deleteContact(id);
             UI.renderPhoneContactList();
-            UI.renderContactsList();
             UI.renderContactsView();
         }
     });
@@ -89,27 +86,27 @@ export function addEventListeners() {
     p.on('click.phonesim', '.dial-key', function() { PhoneSim_Sounds.play('tap'); dialerDisplay.val(dialerDisplay.val() + jQuery_API(this).data('key')); });
     p.on('click.phonesim', '.dialer-backspace', function() { PhoneSim_Sounds.play('tap'); dialerDisplay.val(dialerDisplay.val().slice(0, -1)); });
     p.on('click.phonesim', '.dial-call-btn', function() { PhoneSim_Sounds.play('open'); const number = dialerDisplay.val(); if (!number) return; const contact = Object.entries(PhoneSim_State.contacts).find(([id, c]) => id === number); const callTarget = contact ? { id: contact[0], name: contact[1].profile.note || contact[1].profile.nickname } : { id: number, name: number }; DataHandler.initiatePhoneCall(callTarget); });
-    p.on('click.phonesim', '#emaildetail-view .reply-button', async function() { PhoneSim_Sounds.play('tap'); const senderName = jQuery_API(this).data('sender-name'); const replyContent = await UI.showDialog(`回复 ${senderName}`); if (replyContent) { const prompt = `(系统提示：{{user}}回复了${senderName}的邮件：“${replyContent}”)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); UI.showView('EmailApp'); } });
-    p.on('click.phonesim', '#emaildetail-view .accept-button', async function() { PhoneSim_Sounds.play('open'); const emailId = PhoneSim_State.activeEmailId; const email = PhoneSim_State.emails.find(e => e.id === emailId); if (email && email.attachment) { const prompt = `(系统提示：{{user}}收下了邮件“${email.subject}”中的附件“${email.attachment.name}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); SillyTavern_API.callGenericPopup(`已收下附件：${email.attachment.name}`, 'text'); } });
-    p.on('click.phonesim', '#emailapp-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(jQuery_API(this).closest('.email-item').data('id')); UI.renderEmailList(); } });
-    p.on('click.phonesim', '#phonecall-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_API.callGenericPopup('确定删除这条通话记录吗？', 'confirm')) { await DataHandler.deleteCallLogByTimestamp(jQuery_API(this).closest('.call-log-item').data('id')); UI.renderCallLogView(); } });
-    p.on('click.phonesim', '#emaildetail-view #delete-email-btn', async function() { if (await SillyTavern_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(PhoneSim_State.activeEmailId); UI.showView('EmailApp'); }});
+    p.on('click.phonesim', '#emaildetail-view .reply-button', async function() { PhoneSim_Sounds.play('tap'); const senderName = jQuery_API(this).data('sender-name'); const replyContent = await UI.showDialog(`回复 ${senderName}`); if (replyContent) { const prompt = `(系统提示：{{user}}回复了${senderName}的邮件：“${replyContent}”)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); UI.showView('EmailApp'); } });
+    p.on('click.phonesim', '#emaildetail-view .accept-button', async function() { PhoneSim_Sounds.play('open'); const emailId = PhoneSim_State.activeEmailId; const email = PhoneSim_State.emails.find(e => e.id === emailId); if (email && email.attachment) { const prompt = `(系统提示：{{user}}收下了邮件“${email.subject}”中的附件“${email.attachment.name}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); SillyTavern_Context_API.callGenericPopup(`已收下附件：${email.attachment.name}`, 'text'); } });
+    p.on('click.phonesim', '#emailapp-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_Context_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(jQuery_API(this).closest('.email-item').data('id')); UI.renderEmailList(); } });
+    p.on('click.phonesim', '#phonecall-view .delete-item-btn', async function(e) { e.stopPropagation(); if (await SillyTavern_Context_API.callGenericPopup('确定删除这条通话记录吗？', 'confirm')) { await DataHandler.deleteCallLogByTimestamp(jQuery_API(this).closest('.call-log-item').data('id')); UI.renderCallLogView(); } });
+    p.on('click.phonesim', '#emaildetail-view #delete-email-btn', async function() { if (await SillyTavern_Context_API.callGenericPopup('确定删除这封邮件吗？', 'confirm')) { await DataHandler.deleteEmailById(PhoneSim_State.activeEmailId); UI.showView('EmailApp'); }});
     
     // --- BROWSER APP (DELEGATED EVENTS) ---
     p.on('click.phonesim', '#browser-back-btn', () => DataHandler.browserGoBack());
     p.on('click.phonesim', '#browser-home-btn', () => DataHandler.browserGoToHomePage());
-    p.on('click.phonesim', '#browser-bookmarks-btn', () => UI.showView('BrowserHistoryBookmarks'));
+    p.on('click.phonesim', '#browser-bookmarks-btn', () => UI.showView('BrowserHistory'));
     p.on('click.phonesim', '.back-to-browser-btn', () => UI.showView('BrowserApp'));
     p.on('click.phonesim', '#browser-go-btn', () => DataHandler.browserSearch(p.find('#browser-address-input').val()));
     p.on('keydown.phonesim', '#browser-address-input', (e) => { if (e.key === 'Enter') DataHandler.browserSearch(jQuery_API(e.target).val()); });
     p.on('click.phonesim', '.quick-search-item', function() { DataHandler.browserSearch(jQuery_API(this).data('term')); });
     p.on('click.phonesim', '.search-result-item .result-title', function() { const item = jQuery_API(this); DataHandler.browserLoadPage(item.data('url'), item.data('title')); });
     p.on('click.phonesim', '#browser-bookmark-toggle-btn', function() { const currentUrl = PhoneSim_State.browserHistory[PhoneSim_State.browserHistoryIndex]; const data = currentUrl ? PhoneSim_State.browserData[currentUrl] : null; if (data) DataHandler.toggleBookmark(data.url, data.title); });
-    p.on('click.phonesim', '#history-bookmarks-subview .tab-item', function() { const tab = jQuery_API(this); if (tab.hasClass('active')) return; const targetTab = tab.data('tab'); tab.siblings().removeClass('active').end().addClass('active'); p.find('#history-bookmarks-subview .list-container').removeClass('active').filter(`[data-tab-content="${targetTab}"]`).addClass('active'); p.find('#clear-history-btn').toggle(targetTab !== 'directory'); });
+    p.on('click.phonesim', '#browserhistory-view .tab-item', function() { const tab = jQuery_API(this); if (tab.hasClass('active')) return; const targetTab = tab.data('tab'); tab.siblings().removeClass('active').end().addClass('active'); p.find('#browserhistory-view .list-container').removeClass('active').filter(`[data-tab-content="${targetTab}"]`).addClass('active'); p.find('#clear-history-btn').toggle(targetTab !== 'directory'); });
     p.on('click.phonesim', '.hb-list-item .item-info', function() { const item = jQuery_API(this); DataHandler.browserLoadPage(item.data('url'), item.data('title')); UI.showView('BrowserApp'); });
     p.on('click.phonesim', '.hb-list-item .delete-item-btn', async function() { const item = jQuery_API(this).closest('.hb-list-item'); const url = item.data('url'); const type = jQuery_API(this).data('type'); if (type === 'history') await DataHandler.deleteHistoryItem(url); else if (type === 'bookmark') await DataHandler.deleteBookmarkItem(url); UI.renderHistoryAndBookmarks(); });
-    p.on('click.phonesim', '#clear-history-btn', async () => { const activeTab = p.find('#history-bookmarks-subview .tab-item.active').data('tab'); if (activeTab === 'history') { if (await SillyTavern_API.callGenericPopup('确定清除所有历史记录吗？', 'confirm')) { await DataHandler.clearPersistentHistory(); UI.renderHistoryAndBookmarks(); } } else if (activeTab === 'bookmarks') { if (await SillyTavern_API.callGenericPopup('确定清除所有书签吗？', 'confirm')) { await DataHandler.clearBookmarks(); UI.renderHistoryAndBookmarks(); } } });
-    p.on('click.phonesim', '.webpage-content a[data-download="true"]', (e) => { e.preventDefault(); const link = jQuery_API(e.target); SillyTavern_API.callGenericPopup(`<b>文件下载</b><br><br><b>文件名:</b> ${link.attr('href')}<br><b>描述:</b> ${link.data('description')}<br><br><i>(此功能为模拟，不会实际下载文件)</i>`, 'text'); });
+    p.on('click.phonesim', '#clear-history-btn', async () => { const activeTab = p.find('#browserhistory-view .tab-item.active').data('tab'); if (activeTab === 'history') { if (await SillyTavern_Context_API.callGenericPopup('确定清除所有历史记录吗？', 'confirm')) { await DataHandler.clearPersistentHistory(); UI.renderHistoryAndBookmarks(); } } else if (activeTab === 'bookmarks') { if (await SillyTavern_Context_API.callGenericPopup('确定清除所有书签吗？', 'confirm')) { await DataHandler.clearBookmarks(); UI.renderHistoryAndBookmarks(); } } });
+    p.on('click.phonesim', '.webpage-content a[data-download="true"]', (e) => { e.preventDefault(); const link = jQuery_API(e.target); SillyTavern_Context_API.callGenericPopup(`<b>文件下载</b><br><br><b>文件名:</b> ${link.attr('href')}<br><b>描述:</b> ${link.data('description')}<br><br><i>(此功能为模拟，不会实际下载文件)</i>`, 'text'); });
     
     // --- FORUM & LIVE CENTER APPS ---
     p.on('click.phonesim', '#new-forum-content-btn, #new-live-content-btn, #new-live-stream-btn', function() {
@@ -135,7 +132,7 @@ export function addEventListeners() {
         const content = p.find('#creation-content-input').val().trim();
 
         if (!board || !title || !content) {
-            SillyTavern_API.callGenericPopup('所有字段均为必填项。', 'text');
+            SillyTavern_Context_API.callGenericPopup('所有字段均为必填项。', 'text');
             return;
         }
 
@@ -160,7 +157,7 @@ export function addEventListeners() {
         const boardId = item.data('board-id');
         const boardName = item.data('board-name');
         
-        if (await SillyTavern_API.callGenericPopup(`确定要删除“${boardName}”板块及其所有帖子吗？此操作不可逆。`, 'confirm')) {
+        if (await SillyTavern_Context_API.callGenericPopup(`确定要删除“${boardName}”板块及其所有帖子吗？此操作不可逆。`, 'confirm')) {
             await DataHandler.deleteForumBoard(boardId);
             UI.renderForumBoardList();
         }
@@ -168,11 +165,11 @@ export function addEventListeners() {
 
     p.on('click.phonesim', '.forum-post-item', function() { PhoneSim_Sounds.play('open'); UI.showView('ForumPostDetail', jQuery_API(this).data('post-id')); });
     p.on('click.phonesim', '.live-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('LiveStreamList', jQuery_API(this).data('board-id')); });
-    p.on('click.phonesim', '.live-stream-item', async function() { PhoneSim_Sounds.play('open'); const streamerId = String(jQuery_API(this).data('streamer-id')); UI.showView('LiveStreamRoom', streamerId); const stream = DataHandler.findLiveStreamById(streamerId); if (stream) { const prompt = `(系统提示：{{user}}进入了 ${stream.streamerName} 的直播间“${stream.title}”，请生成当前的直播内容和弹幕。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } else { console.error(`[Phone Sim] Could not find stream data for streamerId: ${streamerId}`); } });
-    const handleSearch = async (inputElement) => { const input = jQuery_API(inputElement); const searchTerm = input.val().trim(); if (!searchTerm) return; PhoneSim_Sounds.play('send'); let prompt = ''; const view = input.closest('.view'); if (view.is('#forumpostlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在论坛的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的帖子列表。)`; view.find('.forum-post-list-content').html(UI.getPostListSkeleton()); } else if (view.is('#livestreamlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在直播中心的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的直播列表。)`; view.find('.live-stream-list-content').html(UI.getStreamListSkeleton()); } if (prompt) { await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); input.val(''); } };
+    p.on('click.phonesim', '.live-stream-item', async function() { PhoneSim_Sounds.play('open'); const streamerId = String(jQuery_API(this).data('streamer-id')); UI.showView('LiveStreamRoom', streamerId); const stream = DataHandler.findLiveStreamById(streamerId); if (stream) { const prompt = `(系统提示：{{user}}进入了 ${stream.streamerName} 的直播间“${stream.title}”，请生成当前的直播内容和弹幕。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); } else { console.error(`[Phone Sim] Could not find stream data for streamerId: ${streamerId}`); } });
+    const handleSearch = async (inputElement) => { const input = jQuery_API(inputElement); const searchTerm = input.val().trim(); if (!searchTerm) return; PhoneSim_Sounds.play('send'); let prompt = ''; const view = input.closest('.view'); if (view.is('#forumpostlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在论坛的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的帖子列表。)`; view.find('.forum-post-list-content').html(UI.getPostListSkeleton()); } else if (view.is('#livestreamlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在直播中心的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的直播列表。)`; view.find('.live-stream-list-content').html(UI.getStreamListSkeleton()); } if (prompt) { await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); input.val(''); } };
     p.on('keydown.phonesim', '.search-input', function(e) { if (e.key === 'Enter') { handleSearch(this); } });
     p.on('click.phonesim', '.search-send-btn', function() { handleSearch(jQuery_API(this).siblings('.search-input')); });
-    p.on('click.phonesim', '.generate-content-btn', async function(e) { e.stopPropagation(); PhoneSim_Sounds.play('send'); const btn = jQuery_API(this); const type = btn.data('type'); const boardId = btn.data('board-id'); const boardName = btn.data('board-name'); let prompt = ''; let viewId, skeletonLoader, contentSelector; if (type === 'forum') { prompt = `(系统提示：{{user}}请求为论坛的“${boardName}”板块生成新的帖子列表和相应的回帖。)`; viewId = 'ForumPostList'; skeletonLoader = UI.getPostListSkeleton; contentSelector = '.forum-post-list-content'; } else if (type === 'live') { prompt = `(系统提示：{{user}}请求为直播中心的“${boardName}”板块生成新的直播列表。)`; viewId = 'LiveStreamList'; skeletonLoader = UI.getStreamListSkeleton; contentSelector = '.live-stream-list-content'; } if (prompt) { UI.showView(viewId, boardId); setTimeout(() => { p.find(`#${viewId.toLowerCase()}-view`).find(contentSelector).html(skeletonLoader()); }, 50); await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } });
+    p.on('click.phonesim', '.generate-content-btn', async function(e) { e.stopPropagation(); PhoneSim_Sounds.play('send'); const btn = jQuery_API(this); const type = btn.data('type'); const boardId = btn.data('board-id'); const boardName = btn.data('board-name'); let prompt = ''; let viewId, skeletonLoader, contentSelector; if (type === 'forum') { prompt = `(系统提示：{{user}}请求为论坛的“${boardName}”板块生成新的帖子列表和相应的回帖。)`; viewId = 'ForumPostList'; skeletonLoader = UI.getPostListSkeleton; contentSelector = '.forum-post-list-content'; } else if (type === 'live') { prompt = `(系统提示：{{user}}请求为直播中心的“${boardName}”板块生成新的直播列表。)`; viewId = 'LiveStreamList'; skeletonLoader = UI.getStreamListSkeleton; contentSelector = '.live-stream-list-content'; } if (prompt) { UI.showView(viewId, boardId); setTimeout(() => { p.find(`#${viewId.toLowerCase()}-view`).find(contentSelector).html(skeletonLoader()); }, 50); await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); } });
     const sendForumReply = () => { const input = p.find('.forum-reply-input'); const content = input.val().trim(); if (content && PhoneSim_State.activeForumPostId) { PhoneSim_Sounds.play('send'); DataHandler.stagePlayerAction({ type: 'new_forum_reply', postId: PhoneSim_State.activeForumPostId, content: content, replyId: 'staged_reply_' + Date.now() }); input.val(''); } };
     p.on('click.phonesim', '.forum-reply-send-btn', sendForumReply);
     p.on('keypress.phonesim', '.forum-reply-input', function(e) { if (e.key === 'Enter') { sendForumReply(); } });
@@ -197,19 +194,19 @@ export function addEventListeners() {
     });
     p.on('click.phonesim', '.post-like-btn', function() { PhoneSim_Sounds.play('tap'); const postId = jQuery_API(this).data('post-id'); DataHandler.stagePlayerAction({ type: 'like_forum_post', postId }); });
     
-    // --- SETTINGS APP (FIXED) ---
-    p.on('click.phonesim', '#mute-switch', function(){ const isActive = jQuery_API(this).toggleClass('active').hasClass('active'); PhoneSim_State.customization.isMuted = isActive; DataHandler.saveCustomization(); PhoneSim_Sounds.play('toggle'); });
-    p.on('click.phonesim', '#change-my-nickname', async () => { PhoneSim_Sounds.play('tap'); const newName = await UI.showDialog('设置我的昵称', PhoneSim_State.customization.playerNickname); if (newName !== null && newName.trim()) { await DataHandler.savePlayerNickname(newName.trim()); } });
+    // --- SETTINGS APP ---
+    p.on('click.phonesim', '#mute-switch', function(){ const isActive = jQuery_API(this).toggleClass('active').hasClass('active'); PhoneSim_State.customization.isMuted = isActive; PhoneSim_State.saveCustomization(); PhoneSim_Sounds.play('toggle'); });
+    p.on('click.phonesim', '#change-my-nickname', async () => { PhoneSim_Sounds.play('tap'); const newName = await UI.showDialog('设置我的昵称', PhoneSim_State.customization.playerNickname); if (newName !== null && newName.trim()) { PhoneSim_State.customization.playerNickname = newName.trim(); PhoneSim_State.saveCustomization(); UI.renderMeView(); } });
     p.on('click.phonesim', '#upload-player-avatar', () => { PhoneSim_Sounds.play('tap'); UI.handleFileUpload('playerAvatar'); });
     p.on('click.phonesim', '#upload-homescreen-wallpaper', () => { PhoneSim_Sounds.play('tap'); UI.handleFileUpload('homescreenWallpaper'); });
     p.on('click.phonesim', '#upload-chatlist-wallpaper', () => { PhoneSim_Sounds.play('tap'); UI.handleFileUpload('chatListWallpaper'); });
     p.on('click.phonesim', '#upload-chatview-wallpaper', () => { PhoneSim_Sounds.play('tap'); UI.handleFileUpload('chatViewWallpaper'); });
     p.on('click.phonesim', '#reset-ui-position', () => { PhoneSim_Sounds.play('tap'); UI.resetUIPosition(); });
-    p.on('click.phonesim', '#reset-all-data', async () => { PhoneSim_Sounds.play('tap'); const result = await SillyTavern_API.callGenericPopup('确定要重置所有手机数据吗？此操作不可逆，将删除所有相关的世界书文件。', 'confirm'); if (result) { await DataHandler.resetAllData(); await DataHandler.fetchAllData(); UI.rerenderCurrentView({ forceRerender: true }); } });
+    p.on('click.phonesim', '#reset-all-data', async () => { PhoneSim_Sounds.play('tap'); const result = await SillyTavern_Context_API.callGenericPopup('确定要重置所有手机数据吗？此操作不可逆，将删除所有相关的世界书文件。', 'confirm'); if (result) { await DataHandler.resetAllData(); await DataHandler.fetchAllData(); UI.rerenderCurrentView({ forceRerender: true }); } });
 
     // --- CALLS ---
-    p.on('click.phonesim', '.reject-call', async () => { PhoneSim_Sounds.play('close'); SillyTavern_API.stopGeneration(); if (PhoneSim_State.incomingCallData) { const prompt = `(系统提示：{{user}}拒绝了来自${PhoneSim_State.incomingCallData.name}的通话。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } UI.closeCallUI(); });
-    p.on('click.phonesim', '.accept-call', async () => { PhoneSim_Sounds.play('open'); if (!PhoneSim_State.incomingCallData) return; const name = PhoneSim_State.incomingCallData.name; p.find('.voice-call-modal').hide().find('audio')[0].pause(); const prompt = `(系统提示：{{user}}接听了${name}的通话。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); PhoneSim_State.incomingCallData = null; });
+    p.on('click.phonesim', '.reject-call', async () => { PhoneSim_Sounds.play('close'); SillyTavern_Context_API.stopGeneration(); if (PhoneSim_State.incomingCallData) { const prompt = `(系统提示：{{user}}拒绝了来自${PhoneSim_State.incomingCallData.name}的通话。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); } UI.closeCallUI(); });
+    p.on('click.phonesim', '.accept-call', async () => { PhoneSim_Sounds.play('open'); if (!PhoneSim_State.incomingCallData) return; const name = PhoneSim_State.incomingCallData.name; p.find('.voice-call-modal').hide().find('audio')[0].pause(); const prompt = `(系统提示：{{user}}接听了${name}的通话。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); PhoneSim_State.incomingCallData = null; });
     p.on('click.phonesim', '.call-ui-internal .voice-input-btn', function(){ PhoneSim_Sounds.play('tap'); jQuery_API(parentWin.document.body).find('#phone-sim-call-input-overlay').show().find('textarea').focus(); });
     p.on('click.phonesim', '.call-ui-internal .record-call-btn', function() { PhoneSim_Sounds.play('toggle'); const btn = jQuery_API(this); btn.toggleClass('active'); PhoneSim_State.isCallRecording = btn.hasClass('active'); const message = PhoneSim_State.isCallRecording ? "通话录音已开始" : "通话录音已结束"; if (parentWin.toastr) { parentWin.toastr.info(message, '通话功能'); } });
     p.on('click.phonesim', '.call-ui-internal .end-call', async function() {
@@ -235,13 +232,13 @@ export function addEventListeners() {
     
             const genericPrompt = `(系统提示：与${contactName}的通话已结束。)`;
             await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(genericPrompt)}`);
-            SillyTavern_API.generate();
+            SillyTavern_Context_API.generate();
         }
         
         UI.closeCallUI();
     });
     b.on('click.phonesim', '#phone-sim-call-input-cancel', function(){ PhoneSim_Sounds.play('tap'); jQuery_API(this).closest('.phone-sim-dialog-overlay').hide(); });
-    b.on('click.phonesim', '#phone-sim-call-input-confirm', async function(){ PhoneSim_Sounds.play('send'); const modal = jQuery_API(this).closest('.phone-sim-dialog-overlay'); const textarea = modal.find('textarea'); const content = textarea.val().trim(); textarea.val(''); modal.hide(); if (content) { const isVoiceCall = PhoneSim_State.isVoiceCallActive; const callData = isVoiceCall ? PhoneSim_State.activeCallData : PhoneSim_State.activePhoneCallData; if (callData) { const contactName = UI._getContactName(callData.id); const callType = isVoiceCall ? '微信语音' : '电话'; const prompt = `(系统提示：{{user}}在与${contactName}的${callType}中说：“${content}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } } });
+    b.on('click.phonesim', '#phone-sim-call-input-confirm', async function(){ PhoneSim_Sounds.play('send'); const modal = jQuery_API(this).closest('.phone-sim-dialog-overlay'); const textarea = modal.find('textarea'); const content = textarea.val().trim(); textarea.val(''); modal.hide(); if (content) { const isVoiceCall = PhoneSim_State.isVoiceCallActive; const callData = isVoiceCall ? PhoneSim_State.activeCallData : PhoneSim_State.activePhoneCallData; if (callData) { const contactName = UI._getContactName(callData.id); const callType = isVoiceCall ? '微信语音' : '电话'; const prompt = `(系统提示：{{user}}在与${contactName}的${callType}中说：“${content}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); } } });
     
     // --- WECHAT NAVIGATION ---
     p.on('click.phonesim', '.back-to-list-btn, .back-to-discover-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ChatApp'); });
@@ -256,7 +253,7 @@ export function addEventListeners() {
         PhoneSim_Sounds.play('tap');
         const id = jQuery_API(this).data('id');
         const contactName = jQuery_API(this).closest('.chat-list-item').find('.chat-name-list').text();
-        if (await SillyTavern_API.callGenericPopup(`确定要清空与 ${contactName} 的聊天记录吗？此操作不可恢复，但不会删除联系人。`, 'confirm')) {
+        if (await SillyTavern_Context_API.callGenericPopup(`确定要清空与 ${contactName} 的聊天记录吗？此操作不可恢复，但不会删除联系人。`, 'confirm')) {
             await DataHandler.clearChatHistoryForContact(id);
             await DataHandler.fetchAllData();
             UI.renderContactsList();
@@ -265,11 +262,10 @@ export function addEventListeners() {
     p.on('click.phonesim', '.contacts-subview .contact-item .delete-contact-btn', async function(e) {
         e.stopPropagation();
         PhoneSim_Sounds.play('tap');
-        const id = jQuery_API(this).data('id');
+        const id = jQuery_API(this).closest('.contact-item').data('id');
         const contactName = jQuery_API(this).siblings('.contact-item-name').text();
-        if (await SillyTavern_API.callGenericPopup(`确定删除联系人 ${contactName} 吗? 这将一并删除所有聊天记录。`, 'confirm')) {
+        if (await SillyTavern_Context_API.callGenericPopup(`确定删除联系人 ${contactName} 吗? 这将一并删除所有聊天记录。`, 'confirm')) {
             await DataHandler.deleteContact(id);
-            UI.renderContactsList();
             UI.renderContactsView();
             UI.renderPhoneContactList();
         }
@@ -283,7 +279,7 @@ export function addEventListeners() {
     // --- GROUP MANAGEMENT ---
     p.on('click.phonesim', '.members-btn', function() { PhoneSim_Sounds.play('tap'); UI.showView('GroupMembers', jQuery_API(this).data('group-id')); });
     p.on('click.phonesim', '.group-invite-btn-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('GroupInvite', PhoneSim_State.activeContactId); });
-    p.on('click.phonesim', '.group-member-item .kick-btn', async function() { PhoneSim_Sounds.play('tap'); const memberId = jQuery_API(this).closest('.group-member-item').data('member-id'); const memberName = UI._getContactName(memberId); if (await SillyTavern_API.callGenericPopup(`确定要将 ${memberName} 移出群聊吗？`, 'confirm')) { DataHandler.stagePlayerAction({ type: 'kick_member', groupId: PhoneSim_State.activeContactId, memberId: memberId }); } });
+    p.on('click.phonesim', '.group-member-item .kick-btn', async function() { PhoneSim_Sounds.play('tap'); const memberId = jQuery_API(this).closest('.group-member-item').data('member-id'); const memberName = UI._getContactName(memberId); if (await SillyTavern_Context_API.callGenericPopup(`确定要将 ${memberName} 移出群聊吗？`, 'confirm')) { DataHandler.stagePlayerAction({ type: 'kick_member', groupId: PhoneSim_State.activeContactId, memberId: memberId }); } });
     function updateGroupConfirmButton(viewSelector, btnSelector) { const selectedCount = p.find(`${viewSelector} .checkbox.checked`).length; const btn = p.find(btnSelector); btn.text(`完成(${selectedCount})`).prop('disabled', selectedCount === 0); }
     p.on('click.phonesim', '.group-creation-contact-item', function() { jQuery_API(this).find('.checkbox').toggleClass('checked'); updateGroupConfirmButton('#groupcreation-view', '#confirm-group-creation-btn'); });
     p.on('click.phonesim', '.invite-contact-item', function() { jQuery_API(this).find('.checkbox').toggleClass('checked'); updateGroupConfirmButton('#groupinvite-view', '#confirm-invite-btn'); });
@@ -322,7 +318,7 @@ export function addEventListeners() {
 
     inputField.on('keypress.phonesim', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
     p.on('click.phonesim', '.close-reply-preview', () => UI.hideReplyPreview());
-    p.on('click.phonesim', '.rich-message.location-message', function() { PhoneSim_Sounds.play('tap'); const location = jQuery_API(this).data('location'); if (location) { SillyTavern_API.callGenericPopup(`<b>📍 地理位置</b><br><br>${location}`, 'text'); } });
+    p.on('click.phonesim', '.rich-message.location-message', function() { PhoneSim_Sounds.play('tap'); const location = jQuery_API(this).data('location'); if (location) { SillyTavern_Context_API.callGenericPopup(`<b>📍 地理位置</b><br><br>${location}`, 'text'); } });
     p.on('click.phonesim', '.pseudo-image-cover', function() { 
         PhoneSim_Sounds.play('tap'); 
         const cover = jQuery_API(this);
@@ -344,8 +340,8 @@ export function addEventListeners() {
     // --- MOMENTS & HOMEPAGE ---
     p.on('click.phonesim', '#discover-moments', () => { PhoneSim_Sounds.play('tap'); UI.showView('Moments'); });
     p.on('click.phonesim', '.clickable-avatar', function() { PhoneSim_Sounds.play('tap'); const contactId = jQuery_API(this).data('contact-id'); UI.showView('Homepage', contactId); });
-    p.on('click.phonesim', '#generate-moment-btn', async () => { PhoneSim_Sounds.play('tap'); const prompt = `(系统提示：请为任意一位角色生成一条新的朋友圈动态。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); });
-    p.on('click.phonesim', '#homepage-view #generate-profile-update-btn', async () => { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeProfileId) { const contactName = UI._getContactName(PhoneSim_State.activeProfileId); const prompt = `(系统提示：请为 ${contactName} 更新个人主页并生成一条新的动态。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } });
+    p.on('click.phonesim', '#generate-moment-btn', async () => { PhoneSim_Sounds.play('tap'); const prompt = `(系统提示：请为任意一位角色生成一条新的朋友圈动态。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); });
+    p.on('click.phonesim', '#homepage-view #generate-profile-update-btn', async () => { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeProfileId) { const contactName = UI._getContactName(PhoneSim_State.activeProfileId); const prompt = `(系统提示：请为 ${contactName} 更新个人主页并生成一条新的动态。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_Context_API.generate(); } });
     p.on('click.phonesim', '#post-moment-btn', async () => { PhoneSim_Sounds.play('tap'); const content = await UI.showDialog('发表新动态'); if(content) DataHandler.stagePlayerAction({ type: 'new_moment', momentId: 'staged_' + Date.now(), data: { content, images: [], timestamp: new Date().toISOString() } }); })
     p.on('click.phonesim', '.moment-actions .like-btn', function() { PhoneSim_Sounds.play('tap'); const btn = jQuery_API(this); const icon = btn.find('i'); const momentId = btn.closest('.moment-post').data('moment-id'); if (!btn.hasClass('liked')) { icon.addClass('popped'); setTimeout(() => icon.removeClass('popped'), 300); } DataHandler.stagePlayerAction({ type: 'like', momentId }); });
     p.on('click.phonesim', '.moment-actions .comment-btn', async function() { PhoneSim_Sounds.play('tap'); const momentId = jQuery_API(this).closest('.moment-post').data('moment-id'); const content = await UI.showDialog('发表评论'); if (content) DataHandler.stagePlayerAction({ type: 'comment', momentId, content, commentId: 'staged_comment_' + Date.now() }); });
@@ -410,8 +406,12 @@ export function addEventListeners() {
             const authorId = clickedElement.data('author-id');
             const isPlayer = String(authorId) === PhoneSim_Config.PLAYER_ID;
             const isReply = clickedElement.data('reply-id');
-            if(isReply) { menuId = isPlayer ? '#player-forum-reply-actions-menu' : '#npc-forum-reply-actions-menu'; }
-            else { menuId = isPlayer ? '#player-forum-post-actions-menu' : '#npc-forum-post-actions-menu'; }
+            if(isReply) {
+                menuId = isPlayer ? '#player-forum-reply-actions-menu' : '#npc-forum-reply-actions-menu';
+            }
+            else {
+                menuId = isPlayer ? '#player-forum-post-actions-menu' : '#npc-forum-post-actions-menu';
+            }
         }
         
         if (!menuId) return;
@@ -434,13 +434,32 @@ export function addEventListeners() {
             left = (buttonRect.left - panelRect.left);
         }
         if (left < 5) left = 5;
-        if (left + menuWidth > panelRect.width - 5) { left = panelRect.width - menuWidth - 5; }
+        if (left + menuWidth > panelRect.width - 5) {
+            left = panelRect.width - menuWidth - 5;
+        }
         
         menu.data(clickedElement.data()).css({ top: `${top}px`, left: `${left}px` }).toggle();
     });
 
     // --- CONTEXT MENUS ---
-    p.on('contextmenu.phonesim', '.moment-comment.player-comment', function(e) { e.preventDefault(); e.stopPropagation(); PhoneSim_Sounds.play('tap'); p.find('.phone-sim-menu').hide(); const commentId = jQuery_API(this).data('comment-id'); const momentId = jQuery_API(this).closest('.moment-post').data('moment-id'); const menu = p.find('#moment-comment-actions-menu'); const panelRect = p[0].getBoundingClientRect(); const top = e.clientY - panelRect.top; let left = e.clientX - panelRect.left; if (left + menu.outerWidth() > panelRect.width - 5) { left = left - menu.outerWidth(); } menu.data({commentId, momentId}).css({top, left}).show(); });
+    p.on('contextmenu.phonesim', '.moment-comment.player-comment', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        PhoneSim_Sounds.play('tap');
+        p.find('.phone-sim-menu').hide();
+        const commentId = jQuery_API(this).data('comment-id');
+        const momentId = jQuery_API(this).closest('.moment-post').data('moment-id');
+        const menu = p.find('#moment-comment-actions-menu');
+
+        const panelRect = p[0].getBoundingClientRect();
+        const top = e.clientY - panelRect.top;
+        let left = e.clientX - panelRect.left;
+        if (left + menu.outerWidth() > panelRect.width - 5) {
+            left = left - menu.outerWidth();
+        }
+        
+        menu.data({commentId, momentId}).css({top, left}).show();
+    });
 
     // --- MENU ITEM ACTIONS ---
     p.on('click.phonesim', '.phone-sim-menu .menu-item', async function() {
@@ -454,17 +473,60 @@ export function addEventListeners() {
         menu.hide();
 
         switch(action) {
-            case 'add-friend': { const friendId = await UI.showDialog('添加好友', '输入好友ID或昵称...'); if(friendId) { const prompt = `(系统提示：{{user}}尝试添加好友：“${friendId}”。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } return; }
-            case 'start-group-chat': UI.showView('GroupCreation'); return;
-            case 'clear_all_history': if(await SillyTavern_API.callGenericPopup('确定清空所有聊天记录吗？', 'confirm')) { await DataHandler.clearAllChatHistory(); await DataHandler.fetchAllData(); UI.renderContactsList(); } return;
-            case 'clear_all_moments': if(await SillyTavern_API.callGenericPopup('确定清空所有动态吗？', 'confirm')) { await DataHandler.clearAllMoments(); await DataHandler.fetchAllData(); if (p.find('#moments-view').hasClass('active')) UI.renderMomentsView(); } return;
-            case 'clear_all_forum_data': if(await SillyTavern_API.callGenericPopup('确定清空所有论坛数据吗？', 'confirm')) { await DataHandler.clearAllForumData(); } return;
-            case 'clear_all_live_data': if(await SillyTavern_API.callGenericPopup('确定清空所有直播数据吗？', 'confirm')) { await DataHandler.clearAllLiveData(); } return;
-            case 'accept': if (uid) { DataHandler.stagePlayerAction({ type: 'accept_transaction', uid: uid }); } return;
-            case 'ignore': return;
-            case 'upload-local-image': UI.handleFileUpload('localImageUpload', PhoneSim_State.activeContactId); return;
-            case 'send-image-url': { const url = await UI.showDialog('输入图片URL'); if (url) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'image', url }, null, '[图片]'); return; }
-            case 'send-image-text': { const text = await UI.showDialog('输入图片描述'); if (text) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'pseudo_image', text }, null, `[图片：${text}]`); return; }
+            case 'add-friend': { 
+                const friendData = await UI.showAddFriendDialog();
+                if (friendData && friendData.id && friendData.nickname) {
+                    await DataHandler.addContactManually(friendData.id, friendData.nickname);
+                }
+                return;
+            }
+            case 'start-group-chat':
+                UI.showView('GroupCreation');
+                return;
+            case 'clear_all_history':
+                if(await SillyTavern_Context_API.callGenericPopup('确定清空所有聊天记录吗？', 'confirm')) {
+                    await DataHandler.clearAllChatHistory();
+                    await DataHandler.fetchAllData();
+                    UI.renderContactsList();
+                }
+                return;
+            case 'clear_all_moments':
+                if(await SillyTavern_Context_API.callGenericPopup('确定清空所有动态吗？', 'confirm')) {
+                    await DataHandler.clearAllMoments();
+                    await DataHandler.fetchAllData();
+                    if (p.find('#moments-view').hasClass('active')) UI.renderMomentsView();
+                }
+                return;
+            case 'clear_all_forum_data':
+                if(await SillyTavern_Context_API.callGenericPopup('确定清空所有论坛数据吗？', 'confirm')) {
+                    await DataHandler.clearAllForumData();
+                }
+                return;
+            case 'clear_all_live_data':
+                 if(await SillyTavern_Context_API.callGenericPopup('确定清空所有直播数据吗？', 'confirm')) {
+                    await DataHandler.clearAllLiveData();
+                }
+                return;
+            case 'accept':
+                if (uid) {
+                    DataHandler.stagePlayerAction({ type: 'accept_transaction', uid: uid });
+                }
+                return;
+            case 'ignore':
+                return;
+            case 'upload-local-image':
+                UI.handleFileUpload('localImageUpload', PhoneSim_State.activeContactId);
+                return;
+            case 'send-image-url': {
+                const url = await UI.showDialog('输入图片URL');
+                if (url) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'image', url }, null, '[图片]');
+                return;
+            }
+            case 'send-image-text': {
+                const text = await UI.showDialog('输入图片描述');
+                if (text) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'pseudo_image', text }, null, `[图片：${text}]`);
+                return;
+            }
             case 'send-voice-message': { 
                 const voiceInput = await UI.showDialog('输入语音内容', '格式: 时长"|文字内容, 例如: 8"|你好呀');
                 if (voiceInput) {
@@ -475,14 +537,26 @@ export function addEventListeners() {
                         const descriptionForAI = `[语音：${duration}]`;
                         DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'voice', duration, text }, null, descriptionForAI);
                     } else {
-                        SillyTavern_API.callGenericPopup('格式不正确，请使用 "时长"|内容" 格式。', 'text');
+                        SillyTavern_Context_API.callGenericPopup('格式不正确，请使用 "时长"|内容" 格式。', 'text');
                     }
                 }
                 return;
             }
-            case 'send-transfer': { const amount = await UI.showDialog('输入转账金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'transfer', amount: parseFloat(amount).toFixed(2), note: '转账', status: 'claimed' }, null, `[转账：${amount}]`); return; }
-            case 'send-red-packet': { const amount = await UI.showDialog('输入红包金额'); if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'red_packet', amount: parseFloat(amount).toFixed(2), note: '恭喜发财，大吉大利', status: 'claimed' }, null, `[红包：${amount}]`); return; }
-            case 'send-location': { const loc = await UI.showDialog('输入位置'); if (loc) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'location', text: loc }, null, `[位置：${loc}]`); return; }
+            case 'send-transfer': {
+                const amount = await UI.showDialog('输入转账金额');
+                if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'transfer', amount: parseFloat(amount).toFixed(2), note: '转账', status: 'claimed' }, null, `[转账：${amount}]`);
+                return;
+            }
+            case 'send-red-packet': {
+                const amount = await UI.showDialog('输入红包金额');
+                if (amount && !isNaN(parseFloat(amount))) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'red_packet', amount: parseFloat(amount).toFixed(2), note: '恭喜发财，大吉大利', status: 'claimed' }, null, `[红包：${amount}]`);
+                return;
+            }
+            case 'send-location': {
+                const loc = await UI.showDialog('输入位置');
+                if (loc) DataHandler.stagePlayerMessage(PhoneSim_State.activeContactId, { type: 'location', text: loc }, null, `[位置：${loc}]`);
+                return;
+            }
             case 'edit_moment': {
                 const moment = PhoneSim_State.moments.find(m => m.momentId === momentId);
                 if (moment) {
@@ -494,7 +568,7 @@ export function addEventListeners() {
                 return;
             }
             case 'delete_moment': {
-                if (await SillyTavern_API.callGenericPopup('确定删除此动态吗?', 'confirm')) {
+                if (await SillyTavern_Context_API.callGenericPopup('确定删除此动态吗?', 'confirm')) {
                     DataHandler.stagePlayerAction({ type: 'delete_moment', momentId });
                 }
                 return;
@@ -514,7 +588,7 @@ export function addEventListeners() {
                 return;
             }
             case 'delete_comment': {
-                if (await SillyTavern_API.callGenericPopup('确定删除此评论吗?', 'confirm')) {
+                if (await SillyTavern_Context_API.callGenericPopup('确定删除此评论吗?', 'confirm')) {
                     DataHandler.stagePlayerAction({ type: 'delete_comment', momentId, commentId });
                 }
                 return;
@@ -530,12 +604,12 @@ export function addEventListeners() {
                 return;
             }
             case 'delete_forum_post': {
-                if (await SillyTavern_API.callGenericPopup('确定删除此帖子吗?', 'confirm')) {
+                if (await SillyTavern_Context_API.callGenericPopup('确定删除此帖子吗?', 'confirm')) {
                     DataHandler.stagePlayerAction({ type: 'delete_forum_post', postId });
                 }
                 return;
             }
-            case 'edit_forum_reply': {
+             case 'edit_forum_reply': {
                 const reply = DataHandler.findForumReplyById(replyId);
                  if (reply) {
                     const newContent = await UI.showDialog('修改回复', typeof reply.content === 'string' ? reply.content : '');
@@ -546,21 +620,21 @@ export function addEventListeners() {
                 return;
             }
             case 'delete_forum_reply': {
-                 if (await SillyTavern_API.callGenericPopup('确定删除此回复吗?', 'confirm')) {
+                 if (await SillyTavern_Context_API.callGenericPopup('确定删除此回复吗?', 'confirm')) {
                     DataHandler.stagePlayerAction({ type: 'delete_forum_reply', replyId });
                 }
                 return;
             }
             case 'report': {
-                SillyTavern_API.callGenericPopup('举报已提交。', 'text');
+                SillyTavern_Context_API.callGenericPopup('举报已提交。', 'text');
                 return;
             }
         }
 
         if (messageUid) {
             let updateType = null;
-            if (action === 'delete') { if (await SillyTavern_API.callGenericPopup('确定删除?', 'confirm')) { updateType = await DataHandler.deleteMessageByUid(messageUid); } }
-            else if (action === 'edit') { const message = DataHandler.findMessageByUid(messageUid); if (message && typeof message.content === 'string') { const newContent = await UI.showDialog('修改消息', message.content); if (newContent !== null) updateType = await DataHandler.editMessageByUid(messageUid, newContent); } else if (message) { SillyTavern_API.callGenericPopup('无法编辑富文本消息。', 'text'); } }
+            if (action === 'delete') { if (await SillyTavern_Context_API.callGenericPopup('确定删除?', 'confirm')) { updateType = await DataHandler.deleteMessageByUid(messageUid); } }
+            else if (action === 'edit') { const message = DataHandler.findMessageByUid(messageUid); if (message && typeof message.content === 'string') { const newContent = await UI.showDialog('修改消息', message.content); if (newContent !== null) updateType = await DataHandler.editMessageByUid(messageUid, newContent); } else if (message) { SillyTavern_Context_API.callGenericPopup('无法编辑富文本消息。', 'text'); } }
             else if (action === 'recall') { updateType = await DataHandler.recallMessageByUid(messageUid); }
             else if (action === 'reply') { const message = DataHandler.findMessageByUid(messageUid); if (message) UI.showReplyPreview(message); }
             if (updateType) { if (updateType === 'worldbook') await DataHandler.fetchAllData(); UI.rerenderCurrentView({ chatUpdated: true }); UI.updateCommitButton(); }

@@ -1,14 +1,16 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
 import { PhoneSim_Parser } from '../parser.js';
 
-let jQuery_API, parentWin, UI, DataHandler;
+let jQuery_API, parentWin, SillyTavern_Context_API, UI, DataHandler;
 let notificationTimeoutId; // Hold the timeout ID for the notification banner
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
+    SillyTavern_Context_API = deps.st_context;
     UI = uiObject;
     DataHandler = dataHandler;
 }

@@ -32,9 +32,10 @@ export function renderBrowserState() {
 
 
 export function renderHistoryAndBookmarks() {
-    const historyList = jQuery_API(parentWin.document.body).find('#history-list').empty();
-    const bookmarksList = jQuery_API(parentWin.document.body).find('#bookmarks-list').empty();
-    const directoryList = jQuery_API(parentWin.document.body).find('#directory-list').empty();
+    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const historyList = p.find('#history-list').empty();
+    const bookmarksList = p.find('#bookmarks-list').empty();
+    const directoryList = p.find('#directory-list').empty();
     const persistentHistory = PhoneSim_State.persistentBrowserHistory;
 
     // Render History from the persistent log

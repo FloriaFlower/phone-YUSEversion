@@ -1,4 +1,6 @@
 
+
+
 import * as Processor from './data_modules/processor.js';
 import * as Actions from './data_modules/actions.js';
 import * as Fetch from './data_modules/fetch.js';
@@ -10,6 +12,10 @@ const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterDa
 
 // Aggregate all functions from sub-modules into this single object.
 export const PhoneSim_DataHandler = {};
+
+// Manually export key functions for inter-module dependency
+export { getOrCreatePhoneLorebook, clearLorebookCache } from './data_modules/actions.js';
+
 
 // Combine functions from each module into the main handler object.
 modules.forEach(module => {

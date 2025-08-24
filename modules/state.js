@@ -23,7 +23,7 @@ export const PhoneSim_State = {
     activeReplyUid: null,
     worldDate: new Date(),
     worldTime: '12:00',
-    customization: { isMuted: false, playerNickname: '我' },
+    customization: { isMuted: false, playerNickname: '我', enabled: true },
     stagedPlayerMessages: [],
     stagedPlayerActions: [],
     pendingFriendRequests: [],
@@ -53,11 +53,19 @@ export const PhoneSim_State = {
     loadCustomization: function() {
         try {
             const saved = JSON.parse(parentWindow.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION) || '{}');
-            const defaultCustomization = { isMuted: false, playerNickname: '我' };
+            const defaultCustomization = { isMuted: false, playerNickname: '我', enabled: true };
             this.customization = { ...defaultCustomization, ...this.customization, ...saved };
         } catch (e) {
             console.error('[Phone Sim] Failed to load customization state from localStorage:', e);
-            this.customization = { isMuted: false, playerNickname: '我' };
+            this.customization = { isMuted: false, playerNickname: '我', enabled: true };
+        }
+    },
+
+    saveCustomization: function() {
+        try {
+            parentWindow.localStorage.setItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION, JSON.stringify(this.customization));
+        } catch (er) {
+            console.error('[Phone Sim] Failed to save customization to localStorage:', er);
         }
     },
 

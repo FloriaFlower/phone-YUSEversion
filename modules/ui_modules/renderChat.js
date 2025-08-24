@@ -295,7 +295,14 @@ export async function renderChatView(contactId, app, isAnimated = true) {
     const avatar = contact.profile.avatar || UI.generateDefaultAvatar(name);
 
     chatView.find('.chat-name').text(name);
-    chatView.find('.header-avatar').attr('src', avatar).data('contact-id', contactId);
+    const headerAvatar = chatView.find('.header-avatar');
+    headerAvatar.attr('src', avatar).data('contact-id', contactId);
+    if(isGroup){
+        headerAvatar.removeClass('clickable-avatar');
+    } else {
+        headerAvatar.addClass('clickable-avatar');
+    }
+
     chatView.find('.edit-note-btn').toggle(!isGroup);
     chatView.find('.header-status').toggle(!isGroup);
     

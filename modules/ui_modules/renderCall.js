@@ -1,12 +1,13 @@
 
+
 import { PhoneSim_State } from '../state.js';
 
-let jQuery_API, parentWin, SillyTavern_API, UI;
+let jQuery_API, parentWin, SillyTavern_Context_API, UI;
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
-    SillyTavern_API = deps.st;
+    SillyTavern_Context_API = deps.st_context;
     UI = uiObject;
 }
 
@@ -116,7 +117,7 @@ export function updatePhoneCall(callData) {
 }
 
 export function closeCallUI() {
-    if(SillyTavern_API) SillyTavern_API.activateSendButtons();
+    if(SillyTavern_Context_API) SillyTavern_Context_API.activateSendButtons();
     const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
     const modal = p.find('.voice-call-modal');
     modal.hide();

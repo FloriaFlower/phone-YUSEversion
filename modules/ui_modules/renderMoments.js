@@ -1,4 +1,5 @@
 
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -28,7 +29,9 @@ export function renderHomepage(contactId) {
     const cover = contact.profile.cover_image ? (contact.profile.cover_image.startsWith('http') ? contact.profile.cover_image : `https://files.catbox.moe/${contact.profile.cover_image}`) : 'https://files.catbox.moe/8mjvdg.jpg';
     const bio = contact.profile.bio || '这个人很懒，什么都没留下。';
     
-    const moments = [...(contact.moments || [])];
+    // CRITICAL FIX: Filter from the global moments list, not the contact's (which might not exist).
+    // Also, cast both IDs to string to prevent type mismatch issues (e.g., number vs string).
+    const moments = [...(PhoneSim_State.moments.filter(m => String(m.posterId) === String(contactId)))];
 
     const homepageHtml = `
         <div class="app-header">

@@ -257,10 +257,10 @@
 }
 
 /* History & Bookmarks */
-#phone-sim-panel-v10-0 #history-bookmarks-subview .app-header {
+#phone-sim-panel-v10-0 #browserhistory-view .app-header {
     justify-content: center;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .header-action-btn {
+#phone-sim-panel-v10-0 #browserhistory-view .header-action-btn {
     position: absolute;
     right: 16px;
     background: none;
@@ -270,12 +270,12 @@
     font-weight: 500;
     cursor: pointer;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .tabs {
+#phone-sim-panel-v10-0 #browserhistory-view .tabs {
     display: flex;
     border-bottom: 1px solid #ddd;
     flex-shrink: 0;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .tab-item {
+#phone-sim-panel-v10-0 #browserhistory-view .tab-item {
     flex: 1;
     text-align: center;
     padding: 12px 0;
@@ -284,11 +284,11 @@
     cursor: pointer;
     position: relative;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .tab-item.active {
+#phone-sim-panel-v10-0 #browserhistory-view .tab-item.active {
     color: #4285F4;
     font-weight: 600;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .tab-item.active::after {
+#phone-sim-panel-v10-0 #browserhistory-view .tab-item.active::after {
     content: '';
     position: absolute;
     bottom: -1px;
@@ -297,15 +297,15 @@
     height: 2px;
     background: #4285F4;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .tab-content {
+#phone-sim-panel-v10-0 #browserhistory-view .tab-content {
     flex: 1;
     overflow-y: auto;
     position: relative;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .list-container {
+#phone-sim-panel-v10-0 #browserhistory-view .list-container {
     display: none;
 }
-#phone-sim-panel-v10-0 #history-bookmarks-subview .list-container.active {
+#phone-sim-panel-v10-0 #browserhistory-view .list-container.active {
     display: block;
 }
 #phone-sim-panel-v10-0 .hb-list-group-title {

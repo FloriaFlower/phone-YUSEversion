@@ -1,25 +1,67 @@
 
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
 
-let SillyTavern_API, TavernHelper_API;
+let SillyTavern_Main_API, SillyTavern_Context_API, TavernHelper_API;
 let parentWin;
 let UI, DataHandler;
 
+// Cache the current lorebook name to avoid repeated async calls within a single operation.
+let currentCharacterLorebookName = null;
+let currentCharacterName = null;
+
 export function init(deps, uiHandler, dataHandler) {
-    SillyTavern_API = deps.st;
+    SillyTavern_Main_API = deps.st;
+    SillyTavern_Context_API = deps.st_context;
     TavernHelper_API = deps.th;
     parentWin = deps.win;
     UI = uiHandler;
     DataHandler = dataHandler;
 }
 
+export function clearLorebookCache() {
+    currentCharacterLorebookName = null;
+    currentCharacterName = null;
+}
+
+export async function getOrCreatePhoneLorebook() {
+    const characterName = SillyTavern_Main_API.getContext().name2;
+    // If character hasn't changed and lorebook name is cached, return it.
+    if (currentCharacterName === characterName && currentCharacterLorebookName) {
+        return currentCharacterLorebookName;
+    }
+
+    currentCharacterName = characterName;
+    const lorebookName = `${PhoneSim_Config.LOREBOOK_PREFIX}${characterName}`;
+
+    // 1. Check if lorebook exists. If not, create it.
+    const allLorebooks = await TavernHelper_API.getWorldbookNames();
+    if (!allLorebooks.includes(lorebookName)) {
+        await TavernHelper_API.createOrReplaceWorldbook(lorebookName, PhoneSim_Config.INITIAL_LOREBOOK_ENTRIES);
+    }
+
+    // 2. Check if lorebook is bound. If not, bind it safely.
+    const charLorebooks = await TavernHelper_API.getCharWorldbookNames('current');
+    if (charLorebooks && !charLorebooks.additional.includes(lorebookName)) {
+        // Read-Modify-Write to safely add our lorebook without removing others.
+        const updatedAdditional = [...charLorebooks.additional, lorebookName];
+        await TavernHelper_API.rebindCharWorldbooks('current', {
+            primary: charLorebooks.primary,
+            additional: updatedAdditional
+        });
+    }
+    
+    // Cache and return the name
+    currentCharacterLorebookName = lorebookName;
+    return lorebookName;
+}
+
+
 export async function _updateWorldbook(dbName, updaterFn) {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await getOrCreatePhoneLorebook();
     if (!lorebookName) {
-        console.error("[Phone Sim] Cannot update worldbook: No primary lorebook is set for the current character.");
+        console.error("[Phone Sim] Cannot update worldbook: Could not get or create a dedicated lorebook.");
         return false;
     }
 
@@ -38,10 +80,11 @@ export async function _updateWorldbook(dbName, updaterFn) {
         const defaultContent = isArrayDb ? '[]' : '{}';
 
         if (dbIndex === -1) {
+            console.warn(`[Phone Sim] Entry '${dbName}' not found in lorebook '${lorebookName}'. This should not happen with the new creation logic. Re-creating.`);
             const newEntry = { 
                 name: dbName, 
                 content: defaultContent, 
-                enabled: false, // Set to false to prevent injection
+                enabled: false,
                 comment: `Managed by Phone Simulator Plugin. Do not edit manually.` 
             };
             entries.push(newEntry);
@@ -51,7 +94,6 @@ export async function _updateWorldbook(dbName, updaterFn) {
         let dbData;
         try {
             const content = entries[dbIndex].content;
-            // Ensure content is not undefined or null before parsing
             dbData = JSON.parse(content || defaultContent);
         } catch(e) {
             console.warn(`[Phone Sim] Could not parse content for ${dbName}, resetting to default. Content was:`, entries[dbIndex].content, e);
@@ -68,6 +110,34 @@ export async function _updateWorldbook(dbName, updaterFn) {
         console.error(`[Phone Sim] Error updating worldbook (${dbName}):`, er);
         return false;
     }
+}
+
+export async function deleteContact(contactId) {
+    // 1. Delete from main database (contains profile, messages, moments)
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        delete dbData[contactId];
+        return dbData;
+    });
+
+    // 2. Delete from avatar storage
+    await _updateWorldbook(PhoneSim_Config.WORLD_AVATAR_DB_NAME, avatarData => {
+        delete avatarData[contactId];
+        return avatarData;
+    });
+    
+    // 3. Delete from contacts directory (maps names to IDs)
+    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+        if (dirData && dirData.contacts) {
+            for (const name in dirData.contacts) {
+                if (dirData.contacts[name] === contactId) {
+                    delete dirData.contacts[name];
+                }
+            }
+        }
+        return dirData;
+    });
+
+    await DataHandler.fetchAllData();
 }
 
 
@@ -104,13 +174,13 @@ export async function initiateVoiceCall(contactId) {
     const contactName = UI._getContactName(contactId);
     const prompt = `(系统提示：{{user}}向${contactName}发起了微信语音通话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
-    SillyTavern_API.generate();
+    SillyTavern_Context_API.generate();
 }
 
 export async function initiatePhoneCall(callTarget) {
     const prompt = `(系统提示：{{user}}正在呼叫${callTarget.name}的电话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
-    SillyTavern_API.generate();
+    SillyTavern_Context_API.generate();
     UI.closeCallUI();
     UI.showView('PhoneApp');
 }
@@ -222,41 +292,58 @@ export async function commitStagedActions() {
 
 
     playerActionsToCommit.forEach(action => {
+        const isPlayerAction = (
+            (action.type === 'delete_moment' && PhoneSim_State.moments.find(m => m.momentId === action.momentId)?.posterId === PhoneSim_Config.PLAYER_ID) ||
+            (action.type === 'edit_moment') ||
+            (action.type === 'delete_comment' && DataHandler.findMomentCommentByUid(action.commentId)?.commenterId === PhoneSim_Config.PLAYER_ID) ||
+            (action.type === 'edit_comment') ||
+            (action.type === 'delete_forum_post' && DataHandler.findForumPostById(action.postId)?.authorId === PhoneSim_Config.PLAYER_ID) ||
+            (action.type === 'edit_forum_post') ||
+            (action.type === 'delete_forum_reply' && DataHandler.findForumReplyById(action.replyId)?.authorId === PhoneSim_Config.PLAYER_ID) ||
+            (action.type === 'edit_forum_reply')
+        );
+
+        if (action.type.startsWith('delete_') && !isPlayerAction) {
+            return; // Skip sending deletion notifications for non-player content
+        }
+        if (action.type.startsWith('edit_') && !isPlayerAction) {
+            return; // Skip sending edit notifications for non-player content
+        }
+
         const group = PhoneSim_State.contacts[action.groupId];
         const groupName = group?.profile.groupName || action.groupId;
 
+        hasActionsForAI = true;
         switch(action.type) {
+            case 'manual_add_friend':
+                textPrompt += `- 通过手机号“${action.id}”添加了新联系人“${action.nickname}”。\n`;
+                break;
             case 'accept_transaction': {
                 const transactionMsg = DataHandler.findMessageByUid(action.uid);
                 if (transactionMsg) {
                     const senderName = UI._getContactName(transactionMsg.sender_id);
                     const typeText = transactionMsg.content.type === 'red_packet' ? '红包' : '转账';
                     textPrompt += `- 接收了${senderName}的${typeText}。\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
             case 'create_group': {
                 const memberNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
                 textPrompt += `- 创建了群聊“${action.groupName}”，并邀请了${memberNames}加入。\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'kick_member': {
                 const memberName = UI._getContactName(action.memberId);
                 textPrompt += `- 在群聊“${groupName}”中将“${memberName}”移出群聊。\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'invite_members': {
                 const invitedNames = action.memberIds.map(id => `“${UI._getContactName(id)}”`).join('、');
                 textPrompt += `- 在群聊“${groupName}”中邀请了${invitedNames}加入群聊。\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'new_moment': {
                 textPrompt += `- 发表了新动态：“${action.data.content}”` + (action.data.images?.length > 0 ? ' [附图片]' : '') + `\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'like': {
@@ -264,7 +351,6 @@ export async function commitStagedActions() {
                 if (moment) {
                     const posterName = UI._getContactName(moment.posterId);
                     textPrompt += `- 点赞了${posterName}的动态\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
@@ -273,7 +359,6 @@ export async function commitStagedActions() {
                 if (moment) {
                     const posterName = UI._getContactName(moment.posterId);
                     textPrompt += `- 评论了${posterName}的动态：“${action.content}”\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
@@ -282,7 +367,6 @@ export async function commitStagedActions() {
                 if (moment) {
                     const posterName = UI._getContactName(moment.posterId);
                     textPrompt += `- 修改了对${posterName}动态的评论为：“${action.content}”\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
@@ -290,51 +374,32 @@ export async function commitStagedActions() {
                 const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
                 if (moment) {
                     textPrompt += `- 撤回了对${UI._getContactName(moment.posterId)}动态的一条评论\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
             case 'delete_comment': {
-                const comment = DataHandler.findMomentCommentByUid(action.commentId);
-                if (comment && String(comment.commenterId) === PhoneSim_Config.PLAYER_ID) {
-                    const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-                    if (moment) {
-                        textPrompt += `- 删除了自己在“${UI._getContactName(moment.posterId)}”动态下的评论\\n`;
-                        hasActionsForAI = true;
-                    }
-                }
+                textPrompt += `- 删除了自己在一条动态下的评论\\n`;
                 break;
             }
             case 'edit_moment': {
-                const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-                if (moment) {
-                    textPrompt += `- 修改了自己的动态：“${action.content}”\\n`;
-                    hasActionsForAI = true;
-                }
+                textPrompt += `- 修改了自己的动态：“${action.content}”\\n`;
                 break;
             }
             case 'delete_moment': {
-                const moment = PhoneSim_State.moments.find(m => m.momentId === action.momentId);
-                if (moment && String(moment.posterId) === PhoneSim_Config.PLAYER_ID) {
-                    textPrompt += `- 删除了自己发布的一条动态\\n`;
-                    hasActionsForAI = true;
-                }
+                textPrompt += `- 删除了自己发布的一条动态\\n`;
                 break;
             }
             case 'friend_request_response': {
                 const responseText = action.action === 'accept' ? '接受了' : '忽略了';
                 textPrompt += `- ${responseText}${action.from_name}的好友请求\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'new_forum_post': {
                 textPrompt += `- 在论坛“${action.boardName}”板块发表了新帖子（帖子ID: ${action.postId}），标题为“${action.title}”，内容为“${action.content}”\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'new_live_stream': {
                 textPrompt += `- 在直播中心“${action.boardName}”板块创建了新的直播间，标题为“${action.title}”，直播简介为“${action.content}”\\n`;
-                hasActionsForAI = true;
                 break;
             }
             case 'new_forum_reply': {
@@ -342,7 +407,6 @@ export async function commitStagedActions() {
                 if (post) {
                     const postAuthorName = UI._getContactName(post.authorId);
                     textPrompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
@@ -350,7 +414,6 @@ export async function commitStagedActions() {
                 const likedPost = DataHandler.findForumPostById(action.postId);
                 if (likedPost) {
                      textPrompt += `- 点赞了${UI._getContactName(likedPost.authorId)}的论坛帖子“${likedPost.title}”\\n`;
-                     hasActionsForAI = true;
                 }
                 break;
             }
@@ -358,39 +421,25 @@ export async function commitStagedActions() {
                  const editedPost = DataHandler.findForumPostById(action.postId);
                  if(editedPost) {
                     textPrompt += `- 修改了论坛帖子“${editedPost.title}”的内容为：“${action.content}”\\n`;
-                    hasActionsForAI = true;
                  }
                  break;
             }
             case 'delete_forum_post': {
-                const postToDelete = DataHandler.findForumPostById(action.postId);
-                if (postToDelete && String(postToDelete.authorId) === PhoneSim_Config.PLAYER_ID) {
-                    textPrompt += `- 删除了自己在论坛发表的帖子“${postToDelete.title}”\\n`;
-                    hasActionsForAI = true;
-                }
+                textPrompt += `- 删除了自己在论坛发表的帖子\\n`;
                 break;
             }
             case 'edit_forum_reply': {
-                const replyToEdit = DataHandler.findForumReplyById(action.replyId);
-                if (replyToEdit) {
-                    textPrompt += `- 修改了在论坛中的一条回复为：“${action.content}”\\n`;
-                    hasActionsForAI = true;
-                }
+                textPrompt += `- 修改了在论坛中的一条回复为：“${action.content}”\\n`;
                 break;
             }
             case 'delete_forum_reply': {
-                const replyToDelete = DataHandler.findForumReplyById(action.replyId);
-                if (replyToDelete && String(replyToDelete.authorId) === PhoneSim_Config.PLAYER_ID) {
-                    textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
-                    hasActionsForAI = true;
-                }
+                textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
                 break;
             }
             case 'new_danmaku': {
                 const stream = DataHandler.findLiveStreamById(action.streamerId);
                 if (stream) {
                     textPrompt += `- 在${stream.streamerName}的直播间发送了弹幕：“${action.content}”\\n`;
-                    hasActionsForAI = true;
                 }
                 break;
             }
@@ -410,25 +459,10 @@ export async function commitStagedActions() {
         
         playerActionsToCommit.forEach(action => {
              switch(action.type) {
-                case 'edit_moment':
-                    for (const contactId in dbData) {
-                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
-                        if (moment) { moment.content = action.content; break; }
-                    }
-                    break;
                 case 'delete_moment':
                     for (const contactId in dbData) {
                         if(dbData[contactId].moments) {
                             dbData[contactId].moments = dbData[contactId].moments.filter(m => m.momentId !== action.momentId);
-                        }
-                    }
-                    break;
-                case 'edit_comment':
-                     for (const contactId in dbData) {
-                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
-                        if (moment) {
-                            const comment = moment.comments?.find(c => c.uid === action.commentId);
-                            if (comment) { comment.text = action.content; break; }
                         }
                     }
                     break;
@@ -437,6 +471,21 @@ export async function commitStagedActions() {
                         const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
                         if(moment && moment.comments) {
                             moment.comments = moment.comments.filter(c => c.uid !== action.commentId);
+                        }
+                    }
+                    break;
+                case 'edit_moment':
+                    for (const contactId in dbData) {
+                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
+                        if (moment) { moment.content = action.content; break; }
+                    }
+                    break;
+                case 'edit_comment':
+                     for (const contactId in dbData) {
+                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
+                        if (moment) {
+                            const comment = moment.comments?.find(c => c.uid === action.commentId);
+                            if (comment) { comment.text = action.content; break; }
                         }
                     }
                     break;
@@ -485,30 +534,30 @@ export async function commitStagedActions() {
                              break;
                          }
                      }
-                } else if (action.type === 'edit_forum_post') {
-                    for (const boardId in forumDb) {
-                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
-                        if (post) { post.content = action.content; break; }
-                    }
                 } else if (action.type === 'delete_forum_post') {
                      for (const boardId in forumDb) {
                          if (forumDb[boardId].posts) {
                              forumDb[boardId].posts = forumDb[boardId].posts.filter(p => p.postId !== action.postId);
                          }
                      }
-                } else if (action.type === 'edit_forum_reply') {
-                     for (const boardId in forumDb) {
-                        for (const post of (forumDb[boardId].posts || [])) {
-                            const reply = post.replies?.find(r => r.replyId === action.replyId);
-                            if (reply) { reply.content = action.content; break; }
-                        }
-                    }
                 } else if (action.type === 'delete_forum_reply') {
                     for (const boardId in forumDb) {
                         for (const post of (forumDb[boardId].posts || [])) {
                             if (post.replies) {
                                 post.replies = post.replies.filter(r => r.replyId !== action.replyId);
                             }
+                        }
+                    }
+                } else if (action.type === 'edit_forum_post') {
+                    for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                        if (post) { post.content = action.content; break; }
+                    }
+                } else if (action.type === 'edit_forum_reply') {
+                     for (const boardId in forumDb) {
+                        for (const post of (forumDb[boardId].posts || [])) {
+                            const reply = post.replies?.find(r => r.replyId === action.replyId);
+                            if (reply) { reply.content = action.content; break; }
                         }
                     }
                 }
@@ -520,7 +569,7 @@ export async function commitStagedActions() {
     if (hasActionsForAI) {
         try {
             await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
-            SillyTavern_API.generate();
+            SillyTavern_Context_API.generate();
         } catch (error) {
             console.error('[Phone Sim] Failed to commit actions:', error);
         }
@@ -556,38 +605,15 @@ export async function savePlayerNickname(newName) {
 }
 
 export async function resetAllData() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await getOrCreatePhoneLorebook();
     if (!lorebookName) {
-        console.error("[Phone Sim] Cannot reset data: No primary lorebook is set.");
+        console.error("[Phone Sim] Cannot reset data: Could not determine lorebook.");
         return;
     }
 
-    const dbsToClear = [
-        PhoneSim_Config.WORLD_DB_NAME,
-        PhoneSim_Config.WORLD_DIR_NAME,
-        PhoneSim_Config.WORLD_AVATAR_DB_NAME,
-        PhoneSim_Config.WORLD_EMAIL_DB_NAME,
-        PhoneSim_Config.WORLD_CALL_LOG_DB_NAME,
-        PhoneSim_Config.WORLD_BROWSER_DATABASE,
-        PhoneSim_Config.WORLD_FORUM_DATABASE,
-        PhoneSim_Config.WORLD_LIVECENTER_DATABASE,
-    ];
-
     try {
-        let entries = await TavernHelper_API.getWorldbook(lorebookName);
-        
-        dbsToClear.forEach(dbName => {
-            const entryIndex = entries.findIndex(e => e.name === dbName);
-            if (entryIndex !== -1) {
-                const isArrayDb = [
-                    PhoneSim_Config.WORLD_EMAIL_DB_NAME, 
-                    PhoneSim_Config.WORLD_CALL_LOG_DB_NAME
-                ].includes(dbName);
-                entries[entryIndex].content = isArrayDb ? '[]' : '{}';
-            }
-        });
-
-        await TavernHelper_API.replaceWorldbook(lorebookName, entries);
+        // We replace the content of the existing lorebook with a fresh structure.
+        await TavernHelper_API.replaceWorldbook(lorebookName, PhoneSim_Config.INITIAL_LOREBOOK_ENTRIES);
 
         // Clear customization from local storage
         parentWin.localStorage.removeItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION);
@@ -735,106 +761,4 @@ export async function markEmailAsRead(emailId) {
         }
         return emails;
     });
-}
-
-export async function deleteEmailById(emailId) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_EMAIL_DB_NAME, emails => {
-        return emails.filter(e => e.id !== emailId);
-    });
-}
-
-export async function deleteCallLogByTimestamp(timestamp) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_CALL_LOG_DB_NAME, callLogs => {
-        return callLogs.filter(log => log.timestamp !== timestamp);
-    });
-}
-
-
-export async function clearChatHistoryForContact(contactId) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        const contact = dbData[contactId];
-        if (contact && contact.app_data && contact.app_data.WeChat) {
-            contact.app_data.WeChat.messages = [];
-            contact.unread = 0;
-        }
-        return dbData;
-    });
-}
-
-export async function clearAllChatHistory() {
-    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        for (const contactId in dbData) {
-            const contact = dbData[contactId];
-            if (contact?.app_data?.WeChat) {
-                contact.app_data.WeChat.messages = [];
-                contact.unread = 0;
-            }
-        }
-        return dbData;
-    });
-}
-
-export async function clearAllMoments() {
-     await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        for (const contactId in dbData) {
-            if (dbData[contactId]) {
-                dbData[contactId].moments = [];
-            }
-        }
-        return dbData;
-    });
-}
-
-export async function deleteContact(contactId) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-        if (dbData[contactId]) {
-            delete dbData[contactId];
-        }
-        Object.keys(dbData).forEach(id => {
-            if (id.startsWith('group_') && dbData[id].profile?.members) {
-                dbData[id].profile.members = dbData[id].profile.members.filter(memberId => memberId !== contactId);
-            }
-        });
-        return dbData;
-    });
-    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
-        if (dirData.contacts) {
-            for (const name in dirData.contacts) {
-                if (dirData.contacts[name] === contactId) {
-                    delete dirData.contacts[name];
-                }
-            }
-        }
-        return dirData;
-    });
-    await _updateWorldbook(PhoneSim_Config.WORLD_AVATAR_DB_NAME, avatarData => {
-        if (avatarData[contactId]) {
-            delete avatarData[contactId];
-        }
-        return avatarData;
-    });
-
-    await DataHandler.fetchAllData();
-}
-
-export async function deleteForumBoard(boardId) {
-    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumDb => {
-        if (forumDb[boardId]) {
-            delete forumDb[boardId];
-        }
-        return forumDb;
-    });
-    await DataHandler.fetchAllData();
-}
-
-export async function clearAllForumData() {
-    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, () => ({}));
-    await DataHandler.fetchAllData();
-    UI.rerenderCurrentView();
-}
-
-export async function clearAllLiveData() {
-    await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, () => ({}));
-    await DataHandler.fetchAllData();
-    UI.rerenderCurrentView();
 }

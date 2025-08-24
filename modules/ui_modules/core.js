@@ -1,14 +1,12 @@
-
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
-let jQuery_API, parentWin, SillyTavern_API, UI, DataHandler;
+let jQuery_API, parentWin, SillyTavern_Context_API, UI, DataHandler;
 
 export function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
-    SillyTavern_API = deps.st;
+    SillyTavern_Context_API = deps.st_context;
     UI = uiObject;
     DataHandler = dataHandler;
 }
@@ -151,12 +149,26 @@ export function showView(viewId, ...args) {
     if (PhoneSim_State.isNavigating) {
         return; // Navigation lock is active, ignore request.
     }
-
+    
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    let targetViewId = viewId;
+    let isSubViewNavigation = false;
+
+    // Special handling for BrowserHistory, which is a subview treated like a main view target
+    if (viewId === 'BrowserHistory') {
+        targetViewId = 'BrowserApp';
+        isSubViewNavigation = true;
+    }
+
     const currentView = p.find('.view.active');
-    const nextView = p.find(`#${viewId.toLowerCase()}-view`);
+    const nextView = p.find(`#${targetViewId.toLowerCase()}-view`);
 
     if (!nextView.length || (currentView.attr('id') === nextView.attr('id') && !args[0]?.forceRerender && !args[0]?.isTabSwitch)) {
+        // If it's just a subview navigation within the same main view, handle it without animation.
+        if (isSubViewNavigation && currentView.attr('id') === nextView.attr('id')) {
+             UI.renderViewContent(viewId, ...args); // This will handle the subview switch
+             return;
+        }
         return;
     }
     
@@ -248,6 +260,16 @@ export function showView(viewId, ...args) {
 
 export function renderViewContent(viewId, ...args) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    
+    // Special case for BrowserHistory: it's a subview of BrowserApp
+    if (viewId === 'BrowserHistory') {
+        const browserView = p.find('#browserapp-view');
+        browserView.find('.browser-subview').removeClass('active');
+        browserView.find('#browserhistory-view').addClass('active');
+        UI.renderHistoryAndBookmarks();
+        return; // Handled, so we exit early.
+    }
+
     switch(viewId) {
         case 'HomeScreen': break; 
         case 'ChatApp': 
@@ -273,7 +295,7 @@ export function renderViewContent(viewId, ...args) {
         case 'EmailDetail': UI.renderEmailDetail(args[0]); break;
         case 'SettingsApp': UI.renderSettingsView(); break;
         case 'BrowserApp': UI.renderBrowserState(); break;
-        case 'BrowserHistoryBookmarks': UI.renderHistoryAndBookmarks(); break;
+        // BrowserHistory is handled above, so no case is needed here.
         case 'ForumApp': UI.renderForumBoardList(); break;
         case 'ForumPostList': UI.renderForumPostList(args[0]); break;
         case 'ForumPostDetail': UI.renderForumPostDetail(args[0]); break;
@@ -285,7 +307,7 @@ export function renderViewContent(viewId, ...args) {
 }
 
 export function renderCreationView() {
-    const p = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0`);
+    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     const form = p.find('#creation-form');
     form[0].reset();
     
@@ -303,4 +325,38 @@ export function renderCreationView() {
     } else {
         boardInput.val('').prop('readonly', false).css('background-color', '');
     }
+}
+
+export async function showAddFriendDialog() {
+    return new Promise(resolve => {
+        const dialog = jQuery_API(parentWin.document.body).find('#phone-sim-add-friend-dialog');
+        const idInput = dialog.find('#add-friend-id-input');
+        const nicknameInput = dialog.find('#add-friend-nickname-input');
+        idInput.val('');
+        nicknameInput.val('');
+
+        dialog.show();
+        idInput.focus();
+
+        const confirmBtn = dialog.find('#phone-sim-add-friend-confirm');
+        const cancelBtn = dialog.find('#phone-sim-add-friend-cancel');
+
+        const close = (value) => {
+            dialog.hide();
+            confirmBtn.off();
+            cancelBtn.off();
+            resolve(value);
+        };
+
+        confirmBtn.one('click', () => {
+            const id = idInput.val().trim();
+            const nickname = nicknameInput.val().trim();
+            if (id && nickname) {
+                close({ id, nickname });
+            } else {
+                SillyTavern_Context_API.callGenericPopup('ID和昵称不能为空。', 'text');
+            }
+        });
+        cancelBtn.one('click', () => close(null));
+    });
 }

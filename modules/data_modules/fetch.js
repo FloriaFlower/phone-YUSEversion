@@ -1,13 +1,16 @@
 
+
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
-let TavernHelper_API, parentWin, UI;
+let TavernHelper_API, parentWin, UI, DataHandler;
 
-export function init(deps, uiHandler) {
+export function init(deps, uiHandler, dataHandler) {
     TavernHelper_API = deps.th;
     parentWin = deps.win;
     UI = uiHandler;
+    DataHandler = dataHandler;
 }
 
 const PRESET_FORUM_BOARDS = {
@@ -40,7 +43,7 @@ export function getBoardNameById(boardId, context) {
 
 
 async function fetchAllDirectoryAndRequests() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) {
         PhoneSim_State.pendingFriendRequests = [];
         return;
@@ -62,7 +65,7 @@ async function fetchAllDirectoryAndRequests() {
 
 
 export async function fetchAllBrowserData() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) {
         PhoneSim_State.persistentBrowserHistory = [];
         PhoneSim_State.browserData = {};
@@ -91,7 +94,7 @@ export async function fetchAllBrowserData() {
 }
 
 export async function fetchAllForumData() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) { PhoneSim_State.forumData = {}; return; }
     try {
         const entries = await TavernHelper_API.getWorldbook(lorebookName);
@@ -104,7 +107,7 @@ export async function fetchAllForumData() {
 }
 
 export async function fetchAllLiveCenterData() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) { PhoneSim_State.liveCenterData = {}; return; }
     try {
         const entries = await TavernHelper_API.getWorldbook(lorebookName);
@@ -141,7 +144,7 @@ export async function fetchAllMoments() {
 }
 
 export async function fetchAllEmails() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) { PhoneSim_State.emails = []; return; }
     try {
         const entries = await TavernHelper_API.getWorldbook(lorebookName);
@@ -154,7 +157,7 @@ export async function fetchAllEmails() {
 }
 
 export async function fetchAllCallLogs() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) { PhoneSim_State.callLogs = []; return; }
     try {
         const entries = await TavernHelper_API.getWorldbook(lorebookName);
@@ -168,7 +171,7 @@ export async function fetchAllCallLogs() {
 
 
 export async function fetchAllContacts() {
-    const lorebookName = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) {
         PhoneSim_State.contacts = {};
         return;
@@ -181,8 +184,6 @@ export async function fetchAllContacts() {
         const dbData = dbEntry ? JSON.parse(dbEntry.content || '{}') : {};
         const avatarData = avatarEntry ? JSON.parse(avatarEntry.content || '{}') : {};
 
-        // BUG FIX: Removed redundant and faulty customization loading from this function.
-        // It is now handled centrally at startup in state.js to prevent data overwrites.
         if (avatarData[PhoneSim_Config.PLAYER_ID]) {
             PhoneSim_State.customization.playerAvatar = avatarData[PhoneSim_Config.PLAYER_ID];
         }
