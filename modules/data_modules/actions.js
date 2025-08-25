@@ -140,6 +140,39 @@ export async function deleteContact(contactId) {
     await DataHandler.fetchAllData();
 }
 
+export async function addContactManually(id, nickname) {
+    // 1. Update the main DB to add the new contact profile
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        if (!dbData[id]) {
+            dbData[id] = {
+                profile: { nickname: nickname, note: nickname },
+                app_data: { WeChat: { messages: [] } },
+                moments: []
+            };
+        }
+        return dbData;
+    });
+
+    // 2. Update the directory DB for name->ID mapping
+    await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
+        if (!dirData.contacts) dirData.contacts = {};
+        dirData.contacts[nickname] = id;
+        return dirData;
+    });
+    
+    // 3. Stage the action for the AI to be notified on the next commit
+    stagePlayerAction({
+        type: 'manual_add_friend',
+        id: id,
+        nickname: nickname
+    });
+
+    // 4. Refresh the application state from the worldbook to reflect the change immediately
+    await DataHandler.fetchAllData();
+    
+    // 5. Re-render the UI to make the new contact visible everywhere
+    UI.rerenderCurrentView({ chatUpdated: true });
+}
 
 export async function logCallRecord(callData) {
     await _updateWorldbook(PhoneSim_Config.WORLD_CALL_LOG_DB_NAME, callLogs => {
@@ -579,8 +612,7 @@ export async function commitStagedActions() {
     UI.rerenderCurrentView({ forceRerender: true });
 }
 
-
-export function saveCustomization() {
+export async function saveCustomization() {
     try {
         parentWin.localStorage.setItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION, JSON.stringify(PhoneSim_State.customization));
         UI.applyCustomizations();
@@ -658,7 +690,6 @@ export async function updateContactNote(contactId, newNote) {
         return dbData;
     });
 }
-
 
 // --- MESSAGE ACTION FUNCTIONS ---
 export function findMessageByUid(messageUid, dbData = null) {
@@ -760,5 +791,73 @@ export async function markEmailAsRead(emailId) {
             email.read = true;
         }
         return emails;
+    });
+}
+
+// --- NEWLY IMPLEMENTED FUNCTIONS ---
+
+export async function deleteEmailById(emailId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_EMAIL_DB_NAME, emails => {
+        return emails.filter(e => e.id !== emailId);
+    });
+}
+
+export async function deleteCallLogByTimestamp(timestamp) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_CALL_LOG_DB_NAME, callLogs => {
+        return callLogs.filter(log => log.timestamp !== timestamp);
+    });
+}
+
+export async function deleteForumBoard(boardId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumData => {
+        delete forumData[boardId];
+        return forumData;
+    });
+}
+
+export async function clearAllChatHistory() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        for (const contactId in dbData) {
+            const contact = dbData[contactId];
+            if (contact?.app_data?.WeChat) {
+                contact.app_data.WeChat.messages = [];
+            }
+            if (contact) {
+                contact.unread = 0;
+            }
+        }
+        return dbData;
+    });
+}
+
+export async function clearAllMoments() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        for (const contactId in dbData) {
+            if (dbData[contactId]) {
+                dbData[contactId].moments = [];
+            }
+        }
+        return dbData;
+    });
+}
+
+export async function clearAllForumData() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, () => ({}));
+}
+
+export async function clearAllLiveData() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, () => ({}));
+}
+
+export async function clearChatHistoryForContact(contactId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        const contact = dbData[contactId];
+        if (contact?.app_data?.WeChat) {
+            contact.app_data.WeChat.messages = [];
+        }
+        if (contact) {
+            contact.unread = 0;
+        }
+        return dbData;
     });
 }

@@ -19,7 +19,7 @@ export const PhoneSim_Config = {
     WORLD_STATE_REGEX: /<WorldState>[\s\S]*?时间[:：]\s*(\d{4}[年\/-]\d{1,2}[月\/-]\d{1,2}[日]?\s*(\d{1,2}:\d{2}))/s,
     INITIAL_LOREBOOK_ENTRIES: [
         { name: '手机模拟器_聊天记录', content: '{}', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
-        { name: '手机模拟器_联系人目录', content: '{}', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
+        { name: '手机模拟器_联系人目录', content: '{}', enabled: true, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
         { name: '手机模拟器_头像存储', content: '{}', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
         { name: '手机模拟器_邮件数据库', content: '[]', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
         { name: '手机模拟器_通话记录', content: '[]', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
