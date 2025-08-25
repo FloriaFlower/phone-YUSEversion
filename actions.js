@@ -42,18 +42,12 @@ export async function getOrCreatePhoneLorebook() {
     }
 
     // 2. Check if lorebook is bound. If not, bind it safely.
-    // BUG FIX: The original logic failed if `charLorebooks` was null (e.g., new character with no lorebooks).
-    // This new robust logic handles null/undefined cases correctly.
     const charLorebooks = await TavernHelper_API.getCharWorldbookNames('current');
-    const isAlreadyBound = charLorebooks?.additional?.includes(lorebookName);
-
-    if (!isAlreadyBound) {
-        const currentPrimary = charLorebooks?.primary || null;
-        const currentAdditional = charLorebooks?.additional || [];
-        const updatedAdditional = [...currentAdditional, lorebookName];
-
+    if (charLorebooks && !charLorebooks.additional.includes(lorebookName)) {
+        // Read-Modify-Write to safely add our lorebook without removing others.
+        const updatedAdditional = [...charLorebooks.additional, lorebookName];
         await TavernHelper_API.rebindCharWorldbooks('current', {
-            primary: currentPrimary,
+            primary: charLorebooks.primary,
             additional: updatedAdditional
         });
     }
@@ -442,42 +436,4 @@ export async function commitStagedActions() {
                 break;
             }
             case 'new_forum_reply': {
-                const post = DataHandler.findForumPostById(action.postId);
-                if(post){
-                    textPrompt += `- 回复了论坛帖子“${post.title}”：“${action.content}”\\n`;
-                }
-                break;
-            }
-            case 'like_forum_post': {
-                 const post = DataHandler.findForumPostById(action.postId);
-                if(post){
-                    textPrompt += `- 点赞了论坛帖子“${post.title}”\\n`;
-                }
-                break;
-            }
-            case 'new_danmaku': {
-                const stream = DataHandler.findLiveStreamById(action.streamerId);
-                if (stream) {
-                    textPrompt += `- 在 ${stream.streamerName} 的直播间“${stream.title}”中发送了弹幕：“${action.content}”\\n`;
-                }
-                break;
-            }
-        }
-    });
-    
-    textPrompt += ')';
-
-    if (hasActionsForAI) {
-        await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-            finalMessagesToPersist.forEach(({ contactId, message }) => {
-                if (dbData[contactId] && dbData[contactId].app_data?.WeChat?.messages) {
-                    dbData[contactId].app_data.WeChat.messages.push(message);
-                }
-            });
-            return dbData;
-        });
-        
-        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
-        SillyTavern_Context_API.generate();
-    }
-}
+                const post = DataHandler.findForumPostById
