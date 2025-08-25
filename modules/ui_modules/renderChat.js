@@ -296,12 +296,7 @@ export async function renderChatView(contactId, app, isAnimated = true) {
 
     chatView.find('.chat-name').text(name);
     const headerAvatar = chatView.find('.header-avatar');
-    headerAvatar.attr('src', avatar).data('contact-id', contactId);
-    if(isGroup){
-        headerAvatar.removeClass('clickable-avatar');
-    } else {
-        headerAvatar.addClass('clickable-avatar');
-    }
+    headerAvatar.attr('src', avatar).data('contact-id', contactId).addClass('clickable-avatar');
 
     chatView.find('.edit-note-btn').toggle(!isGroup);
     chatView.find('.header-status').toggle(!isGroup);

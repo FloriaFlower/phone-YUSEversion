@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -128,20 +129,46 @@ export function togglePanel(forceShow = null) {
 }
 
 export function rerenderCurrentView(updates = {}) {
-    // This function now uses the active ID from the state to provide context for re-rendering.
-    const activeId = 
-        PhoneSim_State.activeLiveStreamId ||
-        PhoneSim_State.activeForumPostId ||
-        PhoneSim_State.activeForumBoardId ||
-        PhoneSim_State.activeProfileId ||
-        PhoneSim_State.activeEmailId ||
-        PhoneSim_State.activeContactId;
+    let activeId = null;
+    const currentViewId = PhoneSim_State.currentView;
 
-    UI.renderViewContent(PhoneSim_State.currentView, activeId);
+    // Determine the correct context ID based on the currently active view
+    switch(currentViewId) {
+        case 'ChatConversation':
+        case 'GroupMembers':
+        case 'GroupInvite':
+            activeId = PhoneSim_State.activeContactId;
+            break;
+        case 'Homepage':
+            activeId = PhoneSim_State.activeProfileId;
+            break;
+        case 'EmailDetail':
+            activeId = PhoneSim_State.activeEmailId;
+            break;
+        case 'ForumPostList':
+            activeId = PhoneSim_State.activeForumBoardId;
+            break;
+        case 'ForumPostDetail':
+            activeId = PhoneSim_State.activeForumPostId;
+            break;
+        case 'LiveStreamList':
+            activeId = PhoneSim_State.activeLiveBoardId;
+            break;
+        case 'LiveStreamRoom':
+            activeId = PhoneSim_State.activeLiveStreamId;
+            break;
+        // Views without a specific ID context don't need to be listed
+    }
 
+    // Always re-render the main content of the current view
+    UI.renderViewContent(currentViewId, activeId);
+
+    // Handle secondary UI updates that might be needed
     if (updates.chatUpdated) {
-        if(PhoneSim_State.currentView === 'ChatApp') UI.renderContactsList();
-        if(PhoneSim_State.currentView.startsWith('Group')) UI.rerenderCurrentView(); // Re-render group views on update
+        // If we are on the main ChatApp screen, we need to refresh the message list
+        if(currentViewId === 'ChatApp') {
+            UI.renderContactsList();
+        }
     }
 }
 

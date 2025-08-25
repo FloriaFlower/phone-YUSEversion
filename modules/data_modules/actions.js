@@ -42,18 +42,12 @@ export async function getOrCreatePhoneLorebook() {
     }
 
     // 2. Check if lorebook is bound. If not, bind it safely.
-    // BUG FIX: The original logic failed if `charLorebooks` was null (e.g., new character with no lorebooks).
-    // This new robust logic handles null/undefined cases correctly.
     const charLorebooks = await TavernHelper_API.getCharWorldbookNames('current');
-    const isAlreadyBound = charLorebooks?.additional?.includes(lorebookName);
-
-    if (!isAlreadyBound) {
-        const currentPrimary = charLorebooks?.primary || null;
-        const currentAdditional = charLorebooks?.additional || [];
-        const updatedAdditional = [...currentAdditional, lorebookName];
-
+    if (charLorebooks && !charLorebooks.additional.includes(lorebookName)) {
+        // Read-Modify-Write to safely add our lorebook without removing others.
+        const updatedAdditional = [...charLorebooks.additional, lorebookName];
         await TavernHelper_API.rebindCharWorldbooks('current', {
-            primary: currentPrimary,
+            primary: charLorebooks.primary,
             additional: updatedAdditional
         });
     }
@@ -443,41 +437,438 @@ export async function commitStagedActions() {
             }
             case 'new_forum_reply': {
                 const post = DataHandler.findForumPostById(action.postId);
-                if(post){
-                    textPrompt += `- 回复了论坛帖子“${post.title}”：“${action.content}”\\n`;
+                if (post) {
+                    const postAuthorName = UI._getContactName(post.authorId);
+                    textPrompt += `- 回复了${postAuthorName}的论坛帖子“${post.title}”：“${action.content}”\\n`;
                 }
                 break;
             }
             case 'like_forum_post': {
-                 const post = DataHandler.findForumPostById(action.postId);
-                if(post){
-                    textPrompt += `- 点赞了论坛帖子“${post.title}”\\n`;
+                const likedPost = DataHandler.findForumPostById(action.postId);
+                if (likedPost) {
+                     textPrompt += `- 点赞了${UI._getContactName(likedPost.authorId)}的论坛帖子“${likedPost.title}”\\n`;
                 }
+                break;
+            }
+            case 'edit_forum_post': {
+                 const editedPost = DataHandler.findForumPostById(action.postId);
+                 if(editedPost) {
+                    textPrompt += `- 修改了论坛帖子“${editedPost.title}”的内容为：“${action.content}”\\n`;
+                 }
+                 break;
+            }
+            case 'delete_forum_post': {
+                textPrompt += `- 删除了自己在论坛发表的帖子\\n`;
+                break;
+            }
+            case 'edit_forum_reply': {
+                textPrompt += `- 修改了在论坛中的一条回复为：“${action.content}”\\n`;
+                break;
+            }
+            case 'delete_forum_reply': {
+                textPrompt += `- 删除了自己在论坛发表的一条回复\\n`;
                 break;
             }
             case 'new_danmaku': {
                 const stream = DataHandler.findLiveStreamById(action.streamerId);
                 if (stream) {
-                    textPrompt += `- 在 ${stream.streamerName} 的直播间“${stream.title}”中发送了弹幕：“${action.content}”\\n`;
+                    textPrompt += `- 在${stream.streamerName}的直播间发送了弹幕：“${action.content}”\\n`;
                 }
                 break;
             }
         }
     });
-    
-    textPrompt += ')';
 
-    if (hasActionsForAI) {
-        await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
-            finalMessagesToPersist.forEach(({ contactId, message }) => {
-                if (dbData[contactId] && dbData[contactId].app_data?.WeChat?.messages) {
-                    dbData[contactId].app_data.WeChat.messages.push(message);
-                }
-            });
-            return dbData;
+    textPrompt += `请根据以上操作，继续推演角色的反应和接下来的剧情。)`;
+
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        finalMessagesToPersist.forEach(item => {
+            const contactObject = dbData[item.contactId];
+            if (contactObject?.app_data?.WeChat) {
+                if (!contactObject.app_data.WeChat.messages) contactObject.app_data.WeChat.messages = [];
+                contactObject.app_data.WeChat.messages.push(item.message);
+            }
         });
         
-        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
-        SillyTavern_Context_API.generate();
+        playerActionsToCommit.forEach(action => {
+             switch(action.type) {
+                case 'delete_moment':
+                    for (const contactId in dbData) {
+                        if(dbData[contactId].moments) {
+                            dbData[contactId].moments = dbData[contactId].moments.filter(m => m.momentId !== action.momentId);
+                        }
+                    }
+                    break;
+                case 'delete_comment':
+                    for (const contactId in dbData) {
+                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
+                        if(moment && moment.comments) {
+                            moment.comments = moment.comments.filter(c => c.uid !== action.commentId);
+                        }
+                    }
+                    break;
+                case 'edit_moment':
+                    for (const contactId in dbData) {
+                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
+                        if (moment) { moment.content = action.content; break; }
+                    }
+                    break;
+                case 'edit_comment':
+                     for (const contactId in dbData) {
+                        const moment = dbData[contactId].moments?.find(m => m.momentId === action.momentId);
+                        if (moment) {
+                            const comment = moment.comments?.find(c => c.uid === action.commentId);
+                            if (comment) { comment.text = action.content; break; }
+                        }
+                    }
+                    break;
+             }
+        });
+
+        return dbData;
+    });
+
+    const forumActions = playerActionsToCommit.filter(a => a.type.includes('forum'));
+    if (forumActions.length > 0) {
+        await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumDb => {
+            forumActions.forEach(action => {
+                 if (action.type === 'new_forum_post') {
+                    const boardId = action.boardId || action.boardName.toLowerCase().replace(/\s/g, '_');
+                    if (!forumDb[boardId]) {
+                        forumDb[boardId] = { boardName: action.boardName, posts: [] };
+                    }
+                    const newPost = {
+                        postId: action.postId, boardId: boardId, authorId: PhoneSim_Config.PLAYER_ID,
+                        authorName: PhoneSim_State.customization.playerNickname || '我', title: action.title,
+                        content: action.content, timestamp: new Date().toISOString(), replies: [], likes: [],
+                    };
+                    forumDb[boardId].posts.push(newPost);
+                } else if (action.type === 'new_forum_reply') {
+                    for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                        if (post) {
+                            if (!post.replies) post.replies = [];
+                            post.replies.push({
+                                replyId: action.replyId, postId: action.postId, authorId: PhoneSim_Config.PLAYER_ID,
+                                authorName: PhoneSim_State.customization.playerNickname || '我', content: action.content,
+                                timestamp: new Date().toISOString()
+                            });
+                            break;
+                        }
+                    }
+                } else if (action.type === 'like_forum_post') {
+                     for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                         if (post) {
+                             if (!post.likes) post.likes = [];
+                             if (!post.likes.includes(PhoneSim_Config.PLAYER_ID)) {
+                                 post.likes.push(PhoneSim_Config.PLAYER_ID);
+                             }
+                             break;
+                         }
+                     }
+                } else if (action.type === 'delete_forum_post') {
+                     for (const boardId in forumDb) {
+                         if (forumDb[boardId].posts) {
+                             forumDb[boardId].posts = forumDb[boardId].posts.filter(p => p.postId !== action.postId);
+                         }
+                     }
+                } else if (action.type === 'delete_forum_reply') {
+                    for (const boardId in forumDb) {
+                        for (const post of (forumDb[boardId].posts || [])) {
+                            if (post.replies) {
+                                post.replies = post.replies.filter(r => r.replyId !== action.replyId);
+                            }
+                        }
+                    }
+                } else if (action.type === 'edit_forum_post') {
+                    for (const boardId in forumDb) {
+                        const post = forumDb[boardId].posts?.find(p => p.postId === action.postId);
+                        if (post) { post.content = action.content; break; }
+                    }
+                } else if (action.type === 'edit_forum_reply') {
+                     for (const boardId in forumDb) {
+                        for (const post of (forumDb[boardId].posts || [])) {
+                            const reply = post.replies?.find(r => r.replyId === action.replyId);
+                            if (reply) { reply.content = action.content; break; }
+                        }
+                    }
+                }
+            });
+            return forumDb;
+        });
     }
+
+    if (hasActionsForAI) {
+        try {
+            await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(textPrompt)}`);
+            SillyTavern_Context_API.generate();
+        } catch (error) {
+            console.error('[Phone Sim] Failed to commit actions:', error);
+        }
+    }
+    
+    await DataHandler.fetchAllData();
+    UI.rerenderCurrentView({ forceRerender: true });
+}
+
+export async function saveCustomization() {
+    try {
+        parentWin.localStorage.setItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION, JSON.stringify(PhoneSim_State.customization));
+        UI.applyCustomizations();
+        // Also re-render relevant views if visible
+        if(PhoneSim_State.isPanelVisible) {
+            if (PhoneSim_State.currentView === 'ChatApp' && PhoneSim_State.activeSubviews.chatapp === 'me') {
+                UI.renderMeView();
+            }
+            if (PhoneSim_State.activeContactId) {
+                UI.renderChatView(PhoneSim_State.activeContactId, 'WeChat');
+            }
+        }
+
+    } catch (er) {
+        console.error('[Phone Sim] Failed to save customization to localStorage:', er);
+    }
+}
+
+export async function savePlayerNickname(newName) {
+    PhoneSim_State.customization.playerNickname = newName;
+    saveCustomization();
+}
+
+export async function resetAllData() {
+    const lorebookName = await getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        console.error("[Phone Sim] Cannot reset data: Could not determine lorebook.");
+        return;
+    }
+
+    try {
+        // We replace the content of the existing lorebook with a fresh structure.
+        await TavernHelper_API.replaceWorldbook(lorebookName, PhoneSim_Config.INITIAL_LOREBOOK_ENTRIES);
+
+        // Clear customization from local storage
+        parentWin.localStorage.removeItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION);
+        PhoneSim_State.loadCustomization(); // Reload defaults
+        UI.applyCustomizations();
+        
+        console.log('[Phone Sim] All data has been reset.');
+
+    } catch (err) {
+        console.error('[Phone Sim] An error occurred during data reset:', err);
+    }
+}
+
+
+export async function saveContactAvatar(contactId, base64data) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_AVATAR_DB_NAME, avatarData => {
+        avatarData[contactId] = base64data;
+        return avatarData;
+    });
+
+    if (contactId !== PhoneSim_Config.PLAYER_ID) {
+        await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+            if (dbData[contactId] && dbData[contactId].profile) {
+                // For both users and groups, we set a flag. The fetcher will handle loading.
+                dbData[contactId].profile.has_custom_avatar = true;
+            }
+            return dbData;
+        });
+    }
+    
+    await DataHandler.fetchAllContacts();
+
+    // Rerender UI based on visibility
+    if (PhoneSim_State.isPanelVisible) {
+        const currentView = PhoneSim_State.currentView;
+        if (currentView === 'ChatConversation' && PhoneSim_State.activeContactId === contactId) {
+            UI.renderChatView(contactId, 'WeChat');
+        } else if (currentView === 'Homepage' && PhoneSim_State.activeProfileId === contactId) {
+            UI.renderHomepage(contactId);
+        }
+        UI.renderContactsList();
+        UI.renderContactsView();
+        UI.renderPhoneContactList();
+    }
+}
+
+export async function updateContactNote(contactId, newNote) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        const contact = dbData[contactId];
+        if (contact && contact.profile) {
+            contact.profile.note = newNote;
+        }
+        return dbData;
+    });
+}
+
+// --- MESSAGE ACTION FUNCTIONS ---
+export function findMessageByUid(messageUid, dbData = null) {
+    const data = dbData || PhoneSim_State.contacts;
+    
+    const stagedMsgContainer = PhoneSim_State.stagedPlayerMessages.find(m => m.tempMessageObject.uid === messageUid);
+    if (stagedMsgContainer) {
+        return stagedMsgContainer.tempMessageObject;
+    }
+
+    for (const contactId in data) {
+        const messages = data[contactId].app_data?.WeChat?.messages;
+        if (messages) {
+            const msg = messages.find(msg => msg.uid === messageUid);
+            if (msg) return msg;
+        }
+    }
+    return null;
+}
+
+export function findMomentCommentByUid(commentUid) {
+    for (const moment of PhoneSim_State.moments) {
+        const comment = moment.comments?.find(c => c.uid === commentUid);
+        if (comment) return comment;
+    }
+    // Also check staged actions
+    for (const action of PhoneSim_State.stagedPlayerActions) {
+        if (action.type === 'comment' && action.commentId === commentUid) {
+            return { uid: action.commentId, commenterId: PhoneSim_Config.PLAYER_ID, text: action.content, isStaged: true };
+        }
+    }
+    return null;
+}
+
+async function _findAndModifyMessage(messageUid, modifierFn) {
+    const stagedIndex = PhoneSim_State.stagedPlayerMessages.findIndex(m => m.tempMessageObject.uid === messageUid);
+    if (stagedIndex > -1) {
+        const result = modifierFn(PhoneSim_State.stagedPlayerMessages[stagedIndex].tempMessageObject);
+        if (result === null) { 
+            PhoneSim_State.stagedPlayerMessages.splice(stagedIndex, 1);
+        } else {
+            PhoneSim_State.stagedPlayerMessages[stagedIndex].tempMessageObject = result;
+            if (typeof result.content === 'string') {
+                PhoneSim_State.stagedPlayerMessages[stagedIndex].content = result.content;
+            }
+        }
+        return 'staged';
+    }
+
+    let messageFoundInWorldbook = false;
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        for (const contactId in dbData) {
+            const messages = dbData[contactId].app_data?.WeChat?.messages;
+            if (messages) {
+                const msgIndex = messages.findIndex(msg => msg.uid === messageUid);
+                if (msgIndex > -1) {
+                    const result = modifierFn(messages[msgIndex]);
+                    if (result === null) {
+                        messages.splice(msgIndex, 1);
+                    } else {
+                        messages[msgIndex] = result;
+                    }
+                    messageFoundInWorldbook = true;
+                    break;
+                }
+            }
+        }
+        return dbData;
+    });
+
+    return messageFoundInWorldbook ? 'worldbook' : null;
+}
+
+export async function deleteMessageByUid(uid) {
+    return await _findAndModifyMessage(uid, () => null);
+}
+
+export async function editMessageByUid(uid, newContent) {
+    return await _findAndModifyMessage(uid, (msg) => {
+        msg.content = newContent;
+        if (msg.recalled) { delete msg.recalled; }
+        return msg;
+    });
+}
+
+export async function recallMessageByUid(uid) {
+    return await _findAndModifyMessage(uid, (msg) => {
+        const senderName = msg.sender_id === PhoneSim_Config.PLAYER_ID ? '你' : UI._getContactName(msg.sender_id);
+        msg.content = `${senderName}撤回了一条消息`;
+        msg.recalled = true;
+        return msg;
+    });
+}
+
+export async function markEmailAsRead(emailId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_EMAIL_DB_NAME, emails => {
+        const email = emails.find(e => e.id === emailId);
+        if (email) {
+            email.read = true;
+        }
+        return emails;
+    });
+}
+
+// --- NEWLY IMPLEMENTED FUNCTIONS ---
+
+export async function deleteEmailById(emailId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_EMAIL_DB_NAME, emails => {
+        return emails.filter(e => e.id !== emailId);
+    });
+}
+
+export async function deleteCallLogByTimestamp(timestamp) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_CALL_LOG_DB_NAME, callLogs => {
+        return callLogs.filter(log => log.timestamp !== timestamp);
+    });
+}
+
+export async function deleteForumBoard(boardId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, forumData => {
+        delete forumData[boardId];
+        return forumData;
+    });
+}
+
+export async function clearAllChatHistory() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        for (const contactId in dbData) {
+            const contact = dbData[contactId];
+            if (contact?.app_data?.WeChat) {
+                contact.app_data.WeChat.messages = [];
+            }
+            if (contact) {
+                contact.unread = 0;
+            }
+        }
+        return dbData;
+    });
+}
+
+export async function clearAllMoments() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        for (const contactId in dbData) {
+            if (dbData[contactId]) {
+                dbData[contactId].moments = [];
+            }
+        }
+        return dbData;
+    });
+}
+
+export async function clearAllForumData() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_FORUM_DATABASE, () => ({}));
+}
+
+export async function clearAllLiveData() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, () => ({}));
+}
+
+export async function clearChatHistoryForContact(contactId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
+        const contact = dbData[contactId];
+        if (contact?.app_data?.WeChat) {
+            contact.app_data.WeChat.messages = [];
+        }
+        if (contact) {
+            contact.unread = 0;
+        }
+        return dbData;
+    });
 }

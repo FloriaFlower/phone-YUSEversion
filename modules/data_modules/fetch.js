@@ -1,6 +1,5 @@
 
 
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -191,8 +190,12 @@ export async function fetchAllContacts() {
         delete dbData.plugin_customization_data;
 
         for (const contactId in dbData) {
-            if (dbData[contactId].profile?.has_custom_avatar) {
-                dbData[contactId].profile.avatar = avatarData[contactId];
+            const contact = dbData[contactId];
+            if (!contact.profile) continue;
+
+            // This now works for both users and groups if they have the flag.
+            if (contact.profile.has_custom_avatar && avatarData[contactId]) {
+                contact.profile.avatar = avatarData[contactId];
             }
         }
         PhoneSim_State.contacts = dbData;

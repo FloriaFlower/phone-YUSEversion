@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -331,9 +332,11 @@ export function addEventListeners() {
     p.on('click.phonesim', '.call-btn', () => { PhoneSim_Sounds.play('tap'); if (PhoneSim_State.activeContactId) DataHandler.initiateVoiceCall(PhoneSim_State.activeContactId); });
     p.on('click.phonesim', '#chatconversation-view .header-avatar.clickable-avatar', function() {
         PhoneSim_Sounds.play('tap');
-        const contactId = PhoneSim_State.activeContactId;
-        if (contactId) {
+        const contactId = String(jQuery_API(this).data('contact-id'));
+        if (contactId.startsWith('group_')) {
             UI.handleFileUpload('contactAvatar', contactId);
+        } else {
+            UI.showView('Homepage', contactId);
         }
     });
 
@@ -500,11 +503,15 @@ export function addEventListeners() {
             case 'clear_all_forum_data':
                 if(await SillyTavern_Context_API.callGenericPopup('确定清空所有论坛数据吗？', 'confirm')) {
                     await DataHandler.clearAllForumData();
+                    await DataHandler.fetchAllData();
+                    if (p.find('#forumapp-view').hasClass('active')) UI.renderForumBoardList();
                 }
                 return;
             case 'clear_all_live_data':
                  if(await SillyTavern_Context_API.callGenericPopup('确定清空所有直播数据吗？', 'confirm')) {
                     await DataHandler.clearAllLiveData();
+                    await DataHandler.fetchAllData();
+                    if (p.find('#livecenterapp-view').hasClass('active')) UI.renderLiveBoardList();
                 }
                 return;
             case 'accept':
