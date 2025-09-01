@@ -1,5 +1,3 @@
-
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -80,11 +78,127 @@ export function addEventListeners() {
     // --- BROWSER APP ---
     // Browser event listeners are complex and numerous, kept separate in wechat_events for now.
     
-    // --- FORUM & LIVE CENTER APPS ---
+        // --- FORUM & LIVE CENTER APPS ---
     p.on('click.phonesim', '.forum-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('ForumPostList', jQuery_API(this).data('board-id')); });
     p.on('click.phonesim', '.forum-post-item', function() { PhoneSim_Sounds.play('open'); UI.showView('ForumPostDetail', jQuery_API(this).data('post-id')); });
     p.on('click.phonesim', '.live-board-item', function() { PhoneSim_Sounds.play('tap'); UI.showView('LiveStreamList', jQuery_API(this).data('board-id')); });
     p.on('click.phonesim', '.live-stream-item', async function() { PhoneSim_Sounds.play('open'); const streamerId = String(jQuery_API(this).data('streamer-id')); UI.showView('LiveStreamRoom', streamerId); const stream = DataHandler.findLiveStreamById(streamerId); if (stream) { const prompt = `(系统提示：{{user}}进入了 ${stream.streamerName} 的直播间“${stream.title}”，请生成当前的直播内容和弹幕。)`; await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); } else { console.error(`[Phone Sim] Could not find stream data for streamerId: ${streamerId}`); } });
+
+    // --- NEW: LIVE STREAMING FUNCTIONALITY ---
+    const showLockScreen = () => {
+        if (p.find('#live-lock-screen').length === 0) {
+            p.append('<div id="live-lock-screen"><button id="end-live-btn">下播</button></div>');
+        }
+        p.find('#live-lock-screen').show();
+    };
+
+    const hideLockScreenAndExit = async () => {
+        const prompt = "直播间已关闭，后续纯文字剧情衔接中...";
+        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+        SillyTavern_API.generate();
+        p.find('#live-lock-screen').hide();
+        // Closes the app by returning to the app drawer
+        UI.showView('AppDrawer');
+    };
+
+    const removeAllModals = () => {
+        p.find('.phone-sim-live-modal-backdrop').remove();
+    };
+
+    // 1. Click "Start Streaming"
+    p.on('click.phonesim', '#start-live-btn', function() {
+        PhoneSim_Sounds.play('tap');
+        const modalHtml = `
+            <div class="phone-sim-live-modal-backdrop" id="live-mode-modal">
+                <div class="phone-sim-live-modal-content">
+                    <h4>选择直播模式</h4>
+                    <button class="modal-option-btn" data-mode="free">自由直播模式</button>
+                    <button class="modal-option-btn" data-mode="pk">PK直播模式</button>
+                    <button class="modal-option-btn" data-mode="co-stream">粉丝连麦模式</button>
+                    <button class="modal-cancel-btn">取消</button>
+                </div>
+            </div>`;
+        p.append(modalHtml);
+    });
+
+    // 2. Choose a streaming mode
+    p.on('click.phonesim', '#live-mode-modal .modal-option-btn', async function() {
+        PhoneSim_Sounds.play('tap');
+        const mode = jQuery_API(this).data('mode');
+        removeAllModals();
+
+        if (mode === 'free') {
+            const prompt = "自由直播模式已开启，直播间加载中...";
+            await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+            SillyTavern_API.generate();
+            showLockScreen();
+        }
+        else if (mode === 'pk') {
+            const pkModalHtml = `
+                <div class="phone-sim-live-modal-backdrop" id="pk-input-modal">
+                    <div class="phone-sim-live-modal-content">
+                        <h4>PK直播模式</h4>
+                        <input type="text" class="pk-input" placeholder="输入你要PK的主播昵称">
+                        <button class="modal-submit-btn">开始PK</button>
+                        <button class="modal-cancel-btn">取消</button>
+                    </div>
+                </div>`;
+            p.append(pkModalHtml);
+        }
+        else if (mode === 'co-stream') {
+            const coStreamModalHtml = `
+                <div class="phone-sim-live-modal-backdrop" id="co-stream-modal">
+                    <div class="phone-sim-live-modal-content">
+                        <h4>粉丝连麦模式</h4>
+                        <button class="modal-option-btn" data-name="霍">霍</button>
+                        <button class="modal-option-btn" data-name="X">X</button>
+                        <button class="modal-option-btn" data-name="难言">难言</button>
+                        <button class="modal-option-btn" data-name="神秘人">神秘人</button>
+                        <button class="modal-cancel-btn">取消</button>
+                    </div>
+                </div>`;
+            p.append(coStreamModalHtml);
+        }
+    });
+
+    // 3a. Submit PK opponent
+    p.on('click.phonesim', '#pk-input-modal .modal-submit-btn', async function() {
+        const opponentName = p.find('.pk-input').val().trim();
+        if (opponentName) {
+            PhoneSim_Sounds.play('send');
+            const prompt = `与${opponentName}进行直播PK`;
+            await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+            SillyTavern_API.generate();
+            removeAllModals();
+            showLockScreen();
+        }
+    });
+
+    // 3b. Choose co-stream partner
+    p.on('click.phonesim', '#co-stream-modal .modal-option-btn', async function() {
+        PhoneSim_Sounds.play('send');
+        const partnerName = jQuery_API(this).data('name');
+        const prompt = `与${partnerName}进行直播连麦`;
+        await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
+        SillyTavern_API.generate();
+        removeAllModals();
+        showLockScreen();
+    });
+
+    // 4. End stream
+    p.on('click.phonesim', '#end-live-btn', function() {
+        PhoneSim_Sounds.play('close');
+        hideLockScreenAndExit();
+    });
+
+    // Universal Cancel button for modals
+    p.on('click.phonesim', '.modal-cancel-btn', function() {
+        PhoneSim_Sounds.play('tap');
+        jQuery_API(this).closest('.phone-sim-live-modal-backdrop').remove();
+    });
+    // --- END NEW ---
+
+    // --- SETTINGS APP ---
     const handleSearch = async (inputElement) => { const input = jQuery_API(inputElement); const searchTerm = input.val().trim(); if (!searchTerm) return; PhoneSim_Sounds.play('send'); let prompt = ''; const view = input.closest('.view'); if (view.is('#forumpostlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在论坛的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的帖子列表。)`; view.find('.forum-post-list-content').html(UI.getPostListSkeleton()); } else if (view.is('#livestreamlist-view')) { const boardName = view.find('.app-header h3').text(); prompt = `(系统提示：{{user}}在直播中心的“${boardName}”板块中搜索：“${searchTerm}”。请生成相关的直播列表。)`; view.find('.live-stream-list-content').html(UI.getStreamListSkeleton()); } if (prompt) { await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`); SillyTavern_API.generate(); input.val(''); } };
     p.on('keydown.phonesim', '.search-input', function(e) { if (e.key === 'Enter') { handleSearch(this); } });
     p.on('click.phonesim', '.search-send-btn', function() { handleSearch(jQuery_API(this).siblings('.search-input')); });
@@ -94,8 +208,6 @@ export function addEventListeners() {
     p.on('keypress.phonesim', '.forum-reply-input', function(e) { if (e.key === 'Enter') { sendForumReply(); } });
     p.on('click.phonesim', '.post-like-btn', function() { PhoneSim_Sounds.play('tap'); const postId = jQuery_API(this).data('post-id'); DataHandler.stagePlayerAction({ type: 'like_forum_post', postId }); });
     p.on('click.phonesim', '.phone-sim-menu .menu-item', async function() { const action = jQuery_API(this).data('action'); if (!['delete_forum_post', 'delete_forum_reply'].includes(action)) return; PhoneSim_Sounds.play('tap'); const menu = jQuery_API(this).parent(); const { postId, replyId } = menu.data(); menu.hide(); if (postId || replyId) { if (action === 'delete_forum_post') { if (await SillyTavern_API.callGenericPopup('确定删除此帖子吗?', 'confirm')) { DataHandler.stagePlayerAction({ type: 'delete_forum_post', postId }); } } else if (action === 'delete_forum_reply') { if (await SillyTavern_API.callGenericPopup('确定删除此回复吗?', 'confirm')) { DataHandler.stagePlayerAction({ type: 'delete_forum_reply', replyId }); } } } });
-
-    // --- SETTINGS APP ---
     p.on('click.phonesim', '#mute-switch', function(){ const isActive = jQuery_API(this).toggleClass('active').hasClass('active'); PhoneSim_State.customization.isMuted = isActive; DataHandler.saveCustomization(); PhoneSim_Sounds.play('toggle'); });
     p.on('click.phonesim', '#change-my-nickname', async () => { PhoneSim_Sounds.play('tap'); const newName = await UI.showDialog('设置我的昵称', PhoneSim_State.customization.playerNickname); if (newName !== null && newName.trim()) { await DataHandler.savePlayerNickname(newName.trim()); } });
     p.on('click.phonesim', '#upload-player-avatar', () => { PhoneSim_Sounds.play('tap'); UI.handleFileUpload('playerAvatar'); });
