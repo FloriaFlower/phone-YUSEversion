@@ -19,9 +19,9 @@ export function init(deps, dataHandler, uiObject) {
 }
 
 export function renderLiveBoardList() {
-    const content = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .live-board-list-content`).empty();
+    const content = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 #livecenterapp-view .live-board-list-content`).empty();
 
-    // --- NEW: Add "Start Streaming" Button ---
+    // --- CRITICAL FIX: Add "Start Streaming" Button ---
     const startLiveHtml = `
         <div class="start-live-container">
             <button id="start-live-btn">
@@ -30,7 +30,7 @@ export function renderLiveBoardList() {
         </div>
     `;
     content.append(startLiveHtml);
-    // --- END NEW ---
+    // --- END CRITICAL FIX ---
 
     for (const boardId in PRESET_BOARDS) {
         const board = PRESET_BOARDS[boardId];
