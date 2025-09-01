@@ -5,7 +5,7 @@ let jQuery_API, parentWin, TavernHelper_API, st_api, UI, DataHandler;
 
 const PRESET_BOARDS = {
     "hot_games": { name: "热门游戏", icon: "fa-gamepad" },
-    "music_station": { name: "音乐台", icon: "fa-music" },
+    "music_station": { name: "欲色专区", icon: "fa-music" },
     "life_chat": { name: "生活闲聊", icon: "fa-coffee" }
 };
 
@@ -20,7 +20,18 @@ export function init(deps, dataHandler, uiObject) {
 
 export function renderLiveBoardList() {
     const content = jQuery_API(parentWin.document.body).find(`#phone-sim-panel-v10-0 .live-board-list-content`).empty();
-    
+
+    // --- NEW: Add "Start Streaming" Button ---
+    const startLiveHtml = `
+        <div class="start-live-container">
+            <button id="start-live-btn">
+                <i class="fas fa-video"></i> 开始直播
+            </button>
+        </div>
+    `;
+    content.append(startLiveHtml);
+    // --- END NEW ---
+
     for (const boardId in PRESET_BOARDS) {
         const board = PRESET_BOARDS[boardId];
         const itemHtml = `
@@ -42,7 +53,7 @@ export async function renderLiveStreamList(boardId) {
     const boardName = PRESET_BOARDS[boardId]?.name || '直播列表';
     view.find('.app-header h3').text(boardName);
     const content = view.find('.live-stream-list-content').empty();
-    
+
     const boardData = PhoneSim_State.liveCenterData[boardId];
     const streams = boardData?.streams || [];
 
@@ -65,7 +76,7 @@ export async function renderLiveStreamList(boardId) {
 
     allStreams.forEach(stream => {
         const streamer = PhoneSim_State.contacts[stream.streamerId];
-        const avatar = (stream.streamerId === PhoneSim_Config.PLAYER_ID) 
+        const avatar = (stream.streamerId === PhoneSim_Config.PLAYER_ID)
             ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar(stream.streamerName))
             : (streamer?.profile?.avatar || UI.generateDefaultAvatar(stream.streamerName));
 
@@ -93,25 +104,20 @@ export function renderLiveStreamRoom(streamerId) {
     const view = jQuery_API(parentWin.document.body).find('#livestreamroom-view');
     const liveData = PhoneSim_State.liveCenterData.active_stream;
 
-    // Find static data from directory as a fallback for the header
     const streamFromDir = DataHandler.findLiveStreamById(streamerId);
-    
-    // Set header title: Use live data first, then directory, then a default
+
     const streamTitle = liveData?.title || streamFromDir?.title || '直播间';
     view.find('.app-header h3').text(streamTitle);
-    
-    // If there's no live data from the AI yet (or it's for another stream after a quick navigation),
-    // show a loading state and wait for the correct AI response.
+
     if (!liveData || liveData.streamerId !== streamerId) {
         view.find('.stream-video-desc').text('正在连接直播间...');
         view.find('.stream-danmaku-container').empty();
         return;
-    } 
-    
-    // If we have the correct live data, render it.
+    }
+
     view.find('.stream-video-desc').text(liveData.videoDescription);
     const danmakuContainer = view.find('.stream-danmaku-container').empty();
-    
+
     (liveData.danmaku || []).forEach(d => {
         const danmakuHtml = `
             <div class="danmaku-item">
