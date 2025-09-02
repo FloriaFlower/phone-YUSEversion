@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../config.js';
 
 let parentWindow;
@@ -12,6 +11,7 @@ export const PhoneSim_State = {
     callLogs: [],
     forumData: {},
     liveCenterData: {},
+    TheaterData: {}, 
     activeContactId: null,
     activeEmailId: null,
     activeProfileId: null,
@@ -23,7 +23,7 @@ export const PhoneSim_State = {
     activeReplyUid: null,
     worldDate: new Date(),
     worldTime: '12:00',
-    customization: { isMuted: false, playerNickname: '我' },
+    customization: { isMuted: false, playerNickname: '{{user}}' },
     stagedPlayerMessages: [],
     stagedPlayerActions: [],
     pendingFriendRequests: [],
@@ -53,11 +53,11 @@ export const PhoneSim_State = {
     loadCustomization: function() {
         try {
             const saved = JSON.parse(parentWindow.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION) || '{}');
-            const defaultCustomization = { isMuted: false, playerNickname: '我' };
+            const defaultCustomization = { isMuted: false, playerNickname: '{{user}}' };
             this.customization = { ...defaultCustomization, ...this.customization, ...saved };
         } catch (e) {
             console.error('[Phone Sim] Failed to load customization state from localStorage:', e);
-            this.customization = { isMuted: false, playerNickname: '我' };
+            this.customization = { isMuted: false, playerNickname: '{{user}}' };
         }
     },
 
@@ -66,9 +66,9 @@ export const PhoneSim_State = {
             const s = JSON.parse(parentWindow.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_UI) || '{}');
             // Selectively assign properties to avoid overwriting initialized objects
             const propertiesToLoad = [
-                'isPanelVisible', 'panelPos', 'currentView', 'activeContactId', 
-                'activeEmailId', 'activeProfileId', 'activeForumBoardId', 
-                'activeForumPostId', 'activeLiveBoardId', 'activeLiveStreamId', 
+                'isPanelVisible', 'panelPos', 'currentView', 'activeContactId',
+                'activeEmailId', 'activeProfileId', 'activeForumBoardId',
+                'activeForumPostId', 'activeLiveBoardId', 'activeLiveStreamId',
                 'activeSubviews'
             ];
             for (const prop of propertiesToLoad) {
@@ -82,8 +82,8 @@ export const PhoneSim_State = {
     },
     saveUiState: function() {
         try {
-            const stateToSave = { 
-                isPanelVisible: this.isPanelVisible, 
+            const stateToSave = {
+                isPanelVisible: this.isPanelVisible,
                 panelPos: this.panelPos,
                 currentView: this.currentView,
                 activeContactId: this.activeContactId,
