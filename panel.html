@@ -4,7 +4,7 @@
     <div class="status-bar"><div class="status-bar-left"><span class="status-time"></span></div><div class="status-bar-right"><i class="fas fa-signal"></i><i class="fas fa-wifi"></i><i class="fas fa-battery-three-quarters"></i></div></div>
     <div class="views-container">
         <div id="homescreen-view" class="view active" data-nav-level="0"><div class="app-grid"></div><div class="dock-bar"></div></div>
-        
+
         <div id="chatapp-view" class="view" data-nav-level="1">
             <div class="subview-wrapper">
                  <div class="chat-list-subview subview active" data-subview="messages">
@@ -32,12 +32,12 @@
             </div>
             <div class="chatapp-bottom-nav"><div class="nav-item active" data-target="messages"><i class="fas fa-comment"></i><span>消息</span><div class="nav-badge"></div></div><div class="nav-item" data-target="contacts"><i class="fas fa-address-book"></i><span>通讯录</span><div class="nav-badge"></div></div><div class="nav-item" data-target="discover"><i class="fas fa-compass"></i><span>发现</span><div class="nav-badge"></div></div><div class="nav-item" data-target="me"><i class="fas fa-user"></i><span>我</span></div></div>
         </div>
-        
+
         <div id="chatconversation-view" class="view" data-nav-level="2">
             <div class="app-header chat-header"><button class="app-back-btn back-to-list-btn"><i class="fas fa-chevron-left"></i></button><div class="header-info"><img src="" class="header-avatar clickable-avatar"><div class="header-text"><div class="chat-name-wrapper"><h2 class="chat-name"></h2><i class="fas fa-pencil-alt edit-note-btn"></i></div><div class="header-status" style="display:none;"><div class="status-dot"></div><span>在线</span></div></div></div><div class="header-icons"><i class="fas fa-phone call-btn"></i><i class="fas fa-users members-btn"></i></div></div>
             <div class="chat-messages"><div class="chat-loader" style="display: none;"></div></div>
             <button class="scroll-to-bottom-btn"><i class="fas fa-chevron-down"></i><span class="unread-badge"></span></button>
-            <div class="reply-preview-bar" style="display:none;"><div class="reply-preview-content"></div><button class="close-reply-preview">&times;</button></div>
+            <div class="reply-preview-bar" style="display:none;"><div class="reply-preview-content"></div><button class="close-reply-preview">×</button></div>
             <div class="chat-input">
                 <button class="emoji-btn"><i class="fas fa-smile"></i></button>
                 <textarea class="input-field" rows="1" placeholder="输入..."></textarea>
@@ -69,15 +69,15 @@
         <div id="groupmembers-view" class="view" data-nav-level="3"><div class="app-header"><button class="app-back-btn back-to-chat-btn"><i class="fas fa-chevron-left"></i></button><h3>群成员</h3></div><div class="group-members-list"></div></div>
         <div id="groupinvite-view" class="view" data-nav-level="4"><div class="app-header"><button class="app-back-btn back-to-members-btn"><i class="fas fa-chevron-left"></i></button><h3>邀请好友</h3><button id="confirm-invite-btn" class="header-confirm-btn">确定</button></div><div class="invite-contact-list"></div></div>
         <div id="groupcreation-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-list-btn"><i class="fas fa-chevron-left"></i></button><h3>发起群聊</h3><button id="confirm-group-creation-btn" class="header-confirm-btn" disabled>完成(0)</button></div><div class="group-creation-contact-list"></div></div>
-        
+
         <div id="moments-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-discover-btn"><i class="fas fa-chevron-left"></i></button><h3>朋友圈</h3><div class="moments-header-actions-wrapper"><div class="header-actions" id="moments-notify-btn" title="查看通知"><i class="fas fa-bell"></i><div class="header-badge"></div></div><div class="header-actions" id="moments-actions-btn"><i class="fas fa-ellipsis-v"></i></div></div></div><div class="moments-timeline"></div></div>
         <div id="homepage-view" class="view" data-nav-level="3"><div class="homepage-content-wrapper"></div></div>
-        
+
         <div id="phoneapp-view" class="view" data-nav-level="1"><div class="subview-wrapper"><div class="phone-contacts-subview subview active"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>通讯录</h3></div><div class="phone-contact-list"></div></div><div class="phone-log-subview subview"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>通话记录</h3></div><div class="call-log-list"></div></div><div class="phone-dialer-subview subview"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>拨号键盘</h3></div><div class="dialer-ui"><div class="dialer-display-wrapper"><input type="text" class="dialer-display" readonly><button class="dialer-backspace"><i class="fas fa-backspace"></i></button></div><div class="dialer-grid"><div class="dial-key" data-key="1">1</div> <div class="dial-key" data-key="2">2<span>ABC</span></div> <div class="dial-key" data-key="3">3<span>DEF</span></div><div class="dial-key" data-key="4">4<span>GHI</span></div> <div class="dial-key" data-key="5">5<span>JKL</span></div> <div class="dial-key" data-key="6">6<span>MNO</span></div><div class="dial-key" data-key="7">7<span>PQRS</span></div><div class="dial-key" data-key="8">8<span>TUV</span></div> <div class="dial-key" data-key="9">9<span>WXYZ</span></div><div class="dial-key" data-key="*">*</div> <div class="dial-key" data-key="0">0<span>+</span></div> <div class="dial-key" data-key="#">#</div></div><div class="dialer-actions"><button class="dial-call-btn"><i class="fas fa-phone"></i></button></div></div></div></div><div class="phoneapp-bottom-nav"><div class="nav-item active" data-target="contacts"><i class="fas fa-address-book"></i><span>通讯录</span></div><div class="nav-item" data-target="log"><i class="fas fa-history"></i><span>通话记录</span></div><div class="nav-item" data-target="dialer"><i class="fas fa-grip-horizontal"></i><span>拨号键盘</span></div></div></div>
-        
+
         <div id="emailapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>邮箱</h3></div><div class="email-list-content"></div></div>
         <div id="emaildetail-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-email-list-btn"><i class="fas fa-chevron-left"></i></button><h3>邮件</h3><div id="delete-email-btn" class="header-actions" title="删除邮件"><i class="fas fa-trash"></i></div></div><div class="email-detail-scroll-content"></div><div class="email-actions"></div></div>
-        
+
         <div id="voicecall-view" class="view" data-nav-level="99"></div>
         <div id="phonecall-view" class="view" data-nav-level="99"></div>
 
@@ -92,6 +92,21 @@
         <div id="livecenterapp-view" class="view" data-nav-level="1"><div class="app-header"><button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button><h3>直播中心</h3><div class="header-actions" id="manage-livecenter-btn"><i class="fas fa-ellipsis-v"></i></div></div><div class="live-board-list-content"></div></div>
         <div id="livestreamlist-view" class="view" data-nav-level="2"><div class="app-header"><button class="app-back-btn back-to-livecenter-btn"><i class="fas fa-chevron-left"></i></button><h3>板块</h3><div class="header-actions" id="new-live-stream-btn"><i class="fas fa-plus"></i></div></div><div class="app-search-bar"><div class="search-input-wrapper"><input type="search" class="search-input" placeholder="搜索直播间..."><button class="search-send-btn"><i class="fas fa-arrow-right"></i></button></div></div><div class="live-stream-list-content"></div></div>
         <div id="livestreamroom-view" class="view" data-nav-level="3"><div class="app-header"><button class="app-back-btn back-to-livestreamlist-btn"><i class="fas fa-chevron-left"></i></button><h3>直播间</h3></div><div class="stream-video-desc"></div><div class="stream-danmaku-container"></div><div class="stream-input-bar"><input type="text" class="stream-danmaku-input" placeholder="发个弹幕呗~"><button class="stream-danmaku-send-btn">发送</button></div></div>
+
+        <!-- [NEW] YUSE THEATER APP VIEW -->
+        <div id="theaterapp-view" class="view" data-nav-level="1">
+            <div class="app-header">
+                <button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button>
+                <h3>欲色剧场</h3>
+            </div>
+            <div class="app-content"></div>
+            <div class="footer-nav">
+                <button class="nav-btn active" data-page="announcements"><span class="icon">📢</span>通告列表</button>
+                <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
+                <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
+                <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>{{user}}商城</button>
+            </div>
+        </div>
 
         <div id="creation-view" class="view" data-nav-level="90">
             <div class="app-header">
@@ -122,7 +137,7 @@
         <div class="phone-sim-notify-modal-content">
             <div class="phone-sim-notify-modal-header">
                 <h3>消息</h3>
-                <button class="phone-sim-notify-close">&times;</button>
+                <button class="phone-sim-notify-close">×</button>
             </div>
             <div class="phone-sim-notify-list"></div>
         </div>
@@ -146,6 +161,15 @@
             </div>
         </div>
     </div>
+    <!-- [NEW] YUSE THEATER MODAL -->
+    <div id="theater-modal" class="theater-modal-overlay" style="display: none;">
+        <div class="theater-modal-content">
+            <div class="theater-modal-header"></div>
+            <div class="theater-modal-body"></div>
+            <div class="theater-modal-footer"></div>
+        </div>
+    </div>
+
 
     <!-- Action Menus -->
     <div class="phone-sim-menu" id="message-actions-menu" style="display:none;"><div class="menu-item" data-action="reply">回复</div><div class="menu-item" data-action="edit">修改</div><div class="menu-item" data-action="recall">撤回</div><div class="menu-item" data-action="delete">删除</div></div>
@@ -167,3 +191,4 @@
     <!-- Core Staged Actions Button -->
     <div id="phone-sim-commit-btn-v10-0"><i class="fas fa-paper-plane"></i></div>
 </div>
+
