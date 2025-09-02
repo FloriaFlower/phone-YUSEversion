@@ -3,7 +3,7 @@
 #phone-sim-panel-v10-0 .live-stream-list-content {
     flex: 1;
     overflow-y: auto;
-    background: #F5EFE5; /* 温柔奶油底色 */
+    background: #F5EFE5; 
 }
 
 /* Search Bar Specifics for Live Center */
@@ -16,7 +16,7 @@
 #phone-sim-panel-v10-0 .start-live-container {
     padding: 16px;
     background: transparent;
-    border-bottom: 2px dotted #E3D5A5; /* 可爱的虚线边框 */
+    border-bottom: 2px dotted #E3D5A5; 
 }
 #phone-sim-panel-v10-0 #start-live-btn {
     width: 100%;
@@ -72,7 +72,7 @@
 }
 #phone-sim-panel-v10-0 .live-stream-item {
     background: #FFFFFF;
-    border-radius: 16px; /* 更圆润的边角 */
+    border-radius: 16px; 
     overflow: hidden;
     border: 1px solid #E3D5A5;
     box-shadow: 0 4px 12px rgba(166, 135, 112, 0.1);
