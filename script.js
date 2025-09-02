@@ -1,4 +1,3 @@
-
 import { PhoneSim_UI } from './modules/ui.js';
 import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
@@ -12,6 +11,10 @@ const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
 let SillyTavern_Context, TavernHelper_API, jQuery_API;
+
+// Regex for Yuse Theater App
+const yuseTheaterRegex = /<yuse_data>.*?<announcements>(.*?)<\/announcements>.*?<customizations>(.*?)<\/customizations>.*?<theater>(.*?)<\/theater>.*?<theater_hot>(.*?)<\/theater_hot>.*?<theater_new>(.*?)<\/theater_new>.*?<theater_recommended>(.*?)<\/theater_recommended>.*?<theater_paid>(.*?)<\/theater_paid>.*?<shop>(.*?)<\/shop>.*?<\/yuse_data>/s;
+
 
 function onSettingChanged() {
     PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
@@ -48,7 +51,8 @@ function addSettingsHtml() {
 const debouncedMainProcessor = (msgId) => {
     clearTimeout(mainProcessorTimeout);
     mainProcessorTimeout = setTimeout(() => {
-        PhoneSim_DataHandler.mainProcessor(msgId);
+        // Pass the new regex to the main processor
+        PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
     }, 250);
 };
 
@@ -62,16 +66,16 @@ async function mainInitialize() {
         jq: jQuery_API,
         win: parentWin
     };
-    
+
     // State is already initialized and customization loaded in the interval
     // Load the rest of the UI state now that we know the extension is enabled.
     PhoneSim_State.loadUiState();
-    
+
     PhoneSim_Sounds.init(PhoneSim_State);
 
     PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
     PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
-    
+
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
         console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
@@ -86,7 +90,7 @@ async function mainInitialize() {
          PhoneSim_DataHandler.clearLorebookCache();
          if(PhoneSim_State.isPanelVisible) PhoneSim_DataHandler.fetchAllData();
     });
-    
+
     if (PhoneSim_State.isPanelVisible) {
         PhoneSim_UI.togglePanel(true);
     }
@@ -110,17 +114,17 @@ function areCoreApisReady() {
 let apiReadyInterval = setInterval(() => {
     if (areCoreApisReady()) {
         clearInterval(apiReadyInterval);
-        
+
         // CRITICAL ORDER: Init state, load customization (which includes 'enabled'), THEN add HTML and check the flag.
         PhoneSim_State.init(parentWin);
         PhoneSim_State.loadCustomization();
-        
+
         addSettingsHtml();
 
         if (PhoneSim_State.customization.enabled) {
             mainInitialize();
         } else {
-            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800;');
+            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800 ;');
         }
     }
 }, 100);
