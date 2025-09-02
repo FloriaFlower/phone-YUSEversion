@@ -1,9 +1,9 @@
-/* Live Center General -- CHEESE THEME */
+/* Live Center General -- FRENCH CREAMY CUTE THEME */
 #phone-sim-panel-v10-0 .live-board-list-content,
 #phone-sim-panel-v10-0 .live-stream-list-content {
     flex: 1;
     overflow-y: auto;
-    background: #FDFCDC; /* 米白 */
+    background: #F5EFE5; /* 温柔奶油底色 */
 }
 
 /* Search Bar Specifics for Live Center */
@@ -12,97 +12,106 @@
     position: relative;
 }
 
-/* Start Live Section -- NEW */
+/* Start Live Section -- NEW CUTE STYLE */
 #phone-sim-panel-v10-0 .start-live-container {
     padding: 16px;
-    background: #FDFCDC;
-    border-bottom: 2px dashed #FADD9A;
+    background: transparent;
+    border-bottom: 2px dotted #E3D5A5; /* 可爱的虚线边框 */
 }
 #phone-sim-panel-v10-0 #start-live-btn {
     width: 100%;
     padding: 15px;
     font-size: 18px;
-    font-weight: bold;
-    color: #5C4033; /* 深棕色文字 */
-    background: linear-gradient(145deg, #FFFAE0, #FFD700); /* 黄色渐变 */
+    font-weight: 600;
+    color: #F5EFE5; /* 奶油白文字 */
+    background: #DAE5D0; /* 淡雅青绿 */
     border: none;
-    border-radius: 25px; /* 圆角矩形 */
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-radius: 18px;
+    box-shadow: 0 4px 10px rgba(218, 229, 208, 0.4);
     cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.3s ease;
+    letter-spacing: 1px;
 }
 #phone-sim-panel-v10-0 #start-live-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 15px rgba(218, 229, 208, 0.6);
 }
 #phone-sim-panel-v10-0 #start-live-btn .fa-video {
-    margin-right: 10px;
+    margin-right: 12px;
+    animation: phone-sim-v14-pulse 2s infinite;
 }
 
 
-/* Board List -- CHEESE THEME */
+/* Board List -- FRENCH CREAMY STYLE */
 #phone-sim-panel-v10-0 .live-board-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid #F0E68C; /* 米黄色边框 */
+    padding: 16px;
+    border-bottom: 1px solid #E3D5A5;
     cursor: pointer;
-    background: #FFFACD; /* 柠檬绸色 */
+    background: transparent;
+    transition: background-color 0.3s ease;
 }
-#phone-sim-panel-v10-0 .live-board-item:hover { background: #FFF8DC; } /* 减少颜色变化 */
-#phone-sim-panel-v10-0 .live-board-icon { font-size: 20px; width: 28px; text-align: center; color: #90EE90; /* 浅绿 */ margin-right: 15px; }
-#phone-sim-panel-v10-0 .live-board-name { font-size: 16px; font-weight: 500; color: #6B4F37; /* 棕色 */ flex-grow: 1; }
+#phone-sim-panel-v10-0 .live-board-item:hover { background: #E3D5A522; }
+#phone-sim-panel-v10-0 .live-board-icon { font-size: 22px; width: 30px; text-align: center; color: #8A9DAE; /* 灰蓝色 */ margin-right: 15px; }
+#phone-sim-panel-v10-0 .live-board-name { font-size: 16px; font-weight: 400; color: #A68770; /* 温柔棕 */ flex-grow: 1; }
 #phone-sim-panel-v10-0 .live-item-actions { display: flex; align-items: center; gap: 16px; }
-#phone-sim-panel-v10-0 .live-item-actions .fa-chevron-right { color: #D2B48C; } /* 棕褐色 */
-#phone-sim-panel-v10-0 .live-item-actions .generate-content-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #8FBC8F; /* 暗海绿色 */ padding: 8px; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-#phone-sim-panel-v10-0 .live-item-actions .generate-content-btn:hover { background-color: #E0EEE0; color: #3CB371; }
+#phone-sim-panel-v10-0 .live-item-actions .fa-chevron-right { color: #E3D5A5; }
+#phone-sim-panel-v10-0 .live-item-actions .generate-content-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #DAE5D0; /* 淡雅青绿 */ padding: 8px; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+#phone-sim-panel-v10-0 .live-item-actions .generate-content-btn:hover { background-color: #DAE5D033; color: #8AAB8A; transform: rotate(90deg); }
 
 
-/* Stream List (GRID VIEW) -- CHEESE THEME */
+/* Stream List (GRID VIEW) -- CUTE CARDS STYLE */
 #phone-sim-panel-v10-0 .live-stream-list-content {
-    padding: 8px;
+    padding: 12px;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 12px;
     align-content: start;
 }
 #phone-sim-panel-v10-0 .live-stream-item {
-    background: #FFFFF0; /* 象牙白 */
-    border-radius: 12px;
+    background: #FFFFFF;
+    border-radius: 16px; /* 更圆润的边角 */
     overflow: hidden;
-    border: 1px solid #F0E68C;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #E3D5A5;
+    box-shadow: 0 4px 12px rgba(166, 135, 112, 0.1);
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+#phone-sim-panel-v10-0 .live-stream-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(166, 135, 112, 0.15);
 }
 #phone-sim-panel-v10-0 .stream-thumbnail-wrapper {
     position: relative;
     padding-top: 56.25%;
-    background-color: #EEE8AA; /* 奶黄色背景 */
+    background-color: #DAE5D0;
 }
 #phone-sim-panel-v10-0 .stream-viewer-count {
     position: absolute;
     bottom: 8px;
     left: 8px;
-    background: rgba(92, 64, 51, 0.7);
+    background: rgba(138, 157, 174, 0.8); /* 灰蓝色背景 */
     color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: 8px;
     font-size: 12px;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
 }
 #phone-sim-panel-v10-0 .stream-info {
-    padding: 8px;
+    padding: 10px;
 }
 #phone-sim-panel-v10-0 .stream-title {
     font-size: 14px;
-    font-weight: 500;
-    color: #5C4033;
-    margin: 0 0 4px;
+    font-weight: 600;
+    color: #A68770;
+    margin: 0 0 5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -113,14 +122,15 @@
     gap: 6px;
 }
 #phone-sim-panel-v10-0 .streamer-avatar-small {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     object-fit: cover;
+    border: 1px solid #F5EFE5;
 }
 #phone-sim-panel-v10-0 .streamer-name-small {
     font-size: 12px;
-    color: #8B7355;
+    color: #8A9DAE;
 }
 
 /* Stream Room -- UNCHANGED (as per request focusing on live center) */
@@ -133,55 +143,58 @@
 #phone-sim-panel-v10-0 .stream-danmaku-input { flex: 1; height: 36px; border: 1px solid #3f3f46; border-radius: 18px; padding: 0 16px; background: #27272a; color: #efeff1; }
 #phone-sim-panel-v10-0 .stream-danmaku-send-btn { width: auto; height: 36px; border: none; border-radius: 18px; background: #9147ff; color: #fff; cursor: pointer; padding: 0 16px; font-weight: 600; }
 
-/* Skeletons -- CHEESE THEME */
+/* Skeletons -- FRENCH CREAMY STYLE */
 .skeleton-stream-list {
-    padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start;
+    padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start;
 }
-.skeleton-stream-list .skeleton-stream-item { background: #FFFFF0; border-radius: 12px; overflow: hidden; border: 1px solid #F0E68C; }
-.skeleton-stream-list .skeleton.thumbnail { height: 100px; border-radius: 0; background-color: #EEE8AA; }
-.skeleton-stream-list .skeleton-stream-info { padding: 8px; }
-.skeleton-stream-list .skeleton.title { height: 13px; width: 80%; margin-bottom: 8px; background-color: #E0D9B7; }
-.skeleton-stream-list .skeleton.meta { height: 20px; width: 60%; background-color: #E0D9B7; }
+.skeleton-stream-list .skeleton-stream-item { background: #FFFFFF; border-radius: 16px; overflow: hidden; border: 1px solid #E3D5A5; }
+.skeleton-stream-list .skeleton.thumbnail { height: 90px; border-radius: 0; background-color: #EAE2D1; }
+.skeleton-stream-list .skeleton-stream-info { padding: 10px; }
+.skeleton-stream-list .skeleton.title { height: 13px; width: 80%; margin-bottom: 8px; background-color: #EAE2D1; }
+.skeleton-stream-list .skeleton.meta { height: 20px; width: 60%; background-color: #EAE2D1; }
 
 
-/* Live Modals & Lock Screen -- NEW */
+/* Live Modals & Lock Screen -- CUTE STYLE */
 .phone-sim-live-modal-backdrop {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: rgba(166, 135, 112, 0.4); /* 温柔棕半透明背景 */
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
 }
 .phone-sim-live-modal-content {
-    background: #FDFCDC;
-    padding: 20px;
+    background: #F5EFE5;
+    padding: 24px;
     border-radius: 20px;
-    border: 3px solid #FADD9A;
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 5px 25px rgba(166, 135, 112, 0.2);
     width: 85%;
     text-align: center;
 }
 .phone-sim-live-modal-content h4 {
-    color: #6B4F37;
+    color: #A68770;
     margin-top: 0;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     font-size: 18px;
+    font-weight: 500;
 }
 .phone-sim-live-modal-content .modal-option-btn,
 .phone-sim-live-modal-content .modal-submit-btn {
     display: block;
     width: 100%;
-    padding: 12px;
-    margin-bottom: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
     border: none;
-    border-radius: 15px;
-    background-color: #90EE90; /* 浅绿 */
+    border-radius: 16px;
+    background-color: #8A9DAE; /* 灰蓝色 */
     color: #fff;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 .phone-sim-live-modal-content .modal-option-btn:last-child {
     margin-bottom: 0;
@@ -189,41 +202,54 @@
 .phone-sim-live-modal-content .modal-option-btn:hover,
 .phone-sim-live-modal-content .modal-submit-btn:hover {
     filter: brightness(1.1);
+    transform: scale(1.03);
 }
 .phone-sim-live-modal-content .modal-cancel-btn {
-    margin-top: 10px;
-    color: #aaa;
+    margin-top: 12px;
+    color: #A68770;
     background: none;
     border: none;
     cursor:pointer;
+    font-size: 14px;
 }
 
 #phone-sim-panel-v10-0 .pk-input {
     width: calc(100% - 24px);
     padding: 12px;
-    border: 2px solid #FADD9A;
-    border-radius: 10px;
+    border: 1px solid #E3D5A5;
+    border-radius: 12px;
     margin-bottom: 15px;
-    background: #FFFACD;
+    background: #FFFFFF;
+    text-align: center;
+    color: #A68770;
+}
+#phone-sim-panel-v10-0 .pk-input::placeholder {
+    color: #E3D5A5;
 }
 
 #live-lock-screen {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(5px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 #end-live-btn {
-    padding: 15px 30px;
+    padding: 15px 35px;
     font-size: 20px;
     font-weight: bold;
     color: white;
-    background: #FF6347; /* 番茄色/红色 */
+    background: #D4A3A3; /* 柔和玫瑰色 */
     border: none;
     border-radius: 50px;
     cursor: pointer;
-    box-shadow: 0 0 20px #FF6347;
+    box-shadow: 0 0 25px #D4A3A3;
+    transition: all 0.3s ease;
+}
+#end-live-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 35px #D4A3A3;
 }
