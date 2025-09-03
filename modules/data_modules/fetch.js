@@ -1,5 +1,3 @@
-
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -19,7 +17,7 @@ const PRESET_FORUM_BOARDS = {
 
 const PRESET_LIVE_BOARDS = {
     "hot_games": { name: "热门游戏" },
-    "music_station": { name: "音乐台" },
+    "music_station": { name: "欲色专区" },
     "life_chat": { name: "生活闲聊" }
 };
 
@@ -75,9 +73,9 @@ export async function fetchAllBrowserData() {
     try {
         const entries = await TavernHelper_API.getWorldbook(lorebookName);
         const browserDbEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_BROWSER_DATABASE);
-        
+
         const browserDb = browserDbEntry ? JSON.parse(browserDbEntry.content || '{}') : {};
-        
+
         PhoneSim_State.persistentBrowserHistory = browserDb.history || []; // For the library view
         PhoneSim_State.browserData = browserDb.pages || {};
         PhoneSim_State.browserBookmarks = browserDb.bookmarks || [];
@@ -126,6 +124,7 @@ export async function fetchAllData() {
     await fetchAllBrowserData();
     await fetchAllForumData();
     await fetchAllLiveCenterData();
+    await DataHandler.fetchAllTheaterData(); // [修改] 新增对欲色剧场数据的获取
     await fetchAllDirectoryAndRequests();
     UI.updateGlobalUnreadCounts();
 }
