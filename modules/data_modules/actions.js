@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
@@ -51,7 +50,7 @@ export async function getOrCreatePhoneLorebook() {
             additional: updatedAdditional
         });
     }
-    
+
     // Cache and return the name
     currentCharacterLorebookName = lorebookName;
     return lorebookName;
@@ -70,22 +69,22 @@ export async function _updateWorldbook(dbName, updaterFn) {
         if (!Array.isArray(entries)) {
             entries = [];
         }
-        
+
         let dbIndex = entries.findIndex(e => e.name === dbName);
-        
+
         const isArrayDb = [
-            PhoneSim_Config.WORLD_EMAIL_DB_NAME, 
+            PhoneSim_Config.WORLD_EMAIL_DB_NAME,
             PhoneSim_Config.WORLD_CALL_LOG_DB_NAME
         ].includes(dbName);
         const defaultContent = isArrayDb ? '[]' : '{}';
 
         if (dbIndex === -1) {
             console.warn(`[Phone Sim] Entry '${dbName}' not found in lorebook '${lorebookName}'. This should not happen with the new creation logic. Re-creating.`);
-            const newEntry = { 
-                name: dbName, 
-                content: defaultContent, 
+            const newEntry = {
+                name: dbName,
+                content: defaultContent,
                 enabled: false,
-                comment: `Managed by Phone Simulator Plugin. Do not edit manually.` 
+                comment: `Managed by Phone Simulator Plugin. Do not edit manually.`
             };
             entries.push(newEntry);
             dbIndex = entries.length - 1;
@@ -102,7 +101,7 @@ export async function _updateWorldbook(dbName, updaterFn) {
 
         const updatedData = updaterFn(dbData);
         entries[dbIndex].content = JSON.stringify(updatedData, null, 2);
-        
+
         await TavernHelper_API.replaceWorldbook(lorebookName, entries);
         return true;
 
@@ -124,7 +123,7 @@ export async function deleteContact(contactId) {
         delete avatarData[contactId];
         return avatarData;
     });
-    
+
     // 3. Delete from contacts directory (maps names to IDs)
     await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
         if (dirData && dirData.contacts) {
@@ -159,7 +158,7 @@ export async function addContactManually(id, nickname) {
         dirData.contacts[nickname] = id;
         return dirData;
     });
-    
+
     // 3. Stage the action for the AI to be notified on the next commit
     stagePlayerAction({
         type: 'manual_add_friend',
@@ -169,7 +168,7 @@ export async function addContactManually(id, nickname) {
 
     // 4. Refresh the application state from the worldbook to reflect the change immediately
     await DataHandler.fetchAllData();
-    
+
     // 5. Re-render the UI to make the new contact visible everywhere
     UI.rerenderCurrentView({ chatUpdated: true });
 }
@@ -205,13 +204,13 @@ export async function addWeChatCallEndMessage(contactId, duration) {
 
 export async function initiateVoiceCall(contactId) {
     const contactName = UI._getContactName(contactId);
-    const prompt = `(系统提示：{{user}}向${contactName}发起了微信语音通话...)`;
+    const prompt = `(系统提示：洛洛向${contactName}发起了微信语音通话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
 }
 
 export async function initiatePhoneCall(callTarget) {
-    const prompt = `(系统提示：{{user}}正在呼叫${callTarget.name}的电话...)`;
+    const prompt = `(系统提示：洛洛正在呼叫${callTarget.name}的电话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
     UI.closeCallUI();
@@ -250,7 +249,7 @@ export function stagePlayerMessage(contactId, messageContent, replyingToUid = nu
 
 export function stagePlayerAction(action) {
     PhoneSim_State.stagedPlayerActions.push(action);
-    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true, liveCenterUpdated: true, chatUpdated: true });
+    UI.rerenderCurrentView({ momentsUpdated: true, forumUpdated: true, liveCenterUpdated: true, chatUpdated: true, theaterUpdated: true }); // [修改] 新增theaterUpdated
     UI.updateCommitButton();
 }
 
@@ -261,7 +260,7 @@ export async function stageFriendRequestResponse(uid, action, from_id, from_name
         request.status = action === 'accept' ? 'accepted' : (action === 'ignore' ? 'declined' : 'pending');
     }
     UI.rerenderCurrentView({ chatUpdated: true });
-    
+
     // Immediately update the worldbook to make the change permanent
     await _updateWorldbook(PhoneSim_Config.WORLD_DIR_NAME, dirData => {
         if (dirData.friend_requests) {
@@ -272,16 +271,16 @@ export async function stageFriendRequestResponse(uid, action, from_id, from_name
         }
         return dirData;
     });
-    
+
     // Stage the action for commit to inform the AI
-    PhoneSim_State.stagedPlayerActions.push({ 
-        type: 'friend_request_response', 
+    PhoneSim_State.stagedPlayerActions.push({
+        type: 'friend_request_response',
         uid: uid,
         action: action,
         from_id: from_id,
         from_name: from_name
     });
-    
+
     UI.updateCommitButton();
 }
 
@@ -294,20 +293,20 @@ export async function commitStagedActions() {
     PhoneSim_State.stagedPlayerActions = [];
     UI.updateCommitButton();
 
-    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
+    let textPrompt = `(系统提示：洛洛刚刚在手机上进行了如下操作：\\n`;
     let hasActionsForAI = false;
-    
+
     const finalMessagesToPersist = [];
-    
+
     if (messagesToCommit.length > 0) {
         hasActionsForAI = true;
         messagesToCommit.forEach(msg => {
             const contact = PhoneSim_State.contacts[msg.contactId];
             if (!contact) return;
-    
+
             const contactName = contact.profile.groupName || contact.profile.note || contact.profile.nickname || msg.contactId;
             const contentForAI = msg.descriptionForAI || (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
-            
+
             if (msg.tempMessageObject.replyingTo) {
                 const originalMsg = DataHandler.findMessageByUid(msg.tempMessageObject.replyingTo);
                 const originalSender = originalMsg ? UI._getContactName(originalMsg.sender_id) : '某人';
@@ -315,10 +314,10 @@ export async function commitStagedActions() {
             } else {
                 textPrompt += `- 在[${contact.profile.groupName ? '群聊' : '私聊'}:${contactName}]中发送消息：“${contentForAI}”\\n`;
             }
-            
+
             const finalMessage = { ...msg.tempMessageObject };
             delete finalMessage.isStaged;
-            finalMessage.sourceMsgId = null; 
+            finalMessage.sourceMsgId = null;
             finalMessagesToPersist.push({ contactId: msg.contactId, message: finalMessage });
         });
     }
@@ -489,7 +488,7 @@ export async function commitStagedActions() {
                 contactObject.app_data.WeChat.messages.push(item.message);
             }
         });
-        
+
         playerActionsToCommit.forEach(action => {
              switch(action.type) {
                 case 'delete_moment':
@@ -607,7 +606,7 @@ export async function commitStagedActions() {
             console.error('[Phone Sim] Failed to commit actions:', error);
         }
     }
-    
+
     await DataHandler.fetchAllData();
     UI.rerenderCurrentView({ forceRerender: true });
 }
@@ -651,7 +650,7 @@ export async function resetAllData() {
         parentWin.localStorage.removeItem(PhoneSim_Config.STORAGE_KEY_CUSTOMIZATION);
         PhoneSim_State.loadCustomization(); // Reload defaults
         UI.applyCustomizations();
-        
+
         console.log('[Phone Sim] All data has been reset.');
 
     } catch (err) {
@@ -675,7 +674,7 @@ export async function saveContactAvatar(contactId, base64data) {
             return dbData;
         });
     }
-    
+
     await DataHandler.fetchAllContacts();
 
     // Rerender UI based on visibility
@@ -705,7 +704,7 @@ export async function updateContactNote(contactId, newNote) {
 // --- MESSAGE ACTION FUNCTIONS ---
 export function findMessageByUid(messageUid, dbData = null) {
     const data = dbData || PhoneSim_State.contacts;
-    
+
     const stagedMsgContainer = PhoneSim_State.stagedPlayerMessages.find(m => m.tempMessageObject.uid === messageUid);
     if (stagedMsgContainer) {
         return stagedMsgContainer.tempMessageObject;
@@ -739,7 +738,7 @@ async function _findAndModifyMessage(messageUid, modifierFn) {
     const stagedIndex = PhoneSim_State.stagedPlayerMessages.findIndex(m => m.tempMessageObject.uid === messageUid);
     if (stagedIndex > -1) {
         const result = modifierFn(PhoneSim_State.stagedPlayerMessages[stagedIndex].tempMessageObject);
-        if (result === null) { 
+        if (result === null) {
             PhoneSim_State.stagedPlayerMessages.splice(stagedIndex, 1);
         } else {
             PhoneSim_State.stagedPlayerMessages[stagedIndex].tempMessageObject = result;
@@ -858,6 +857,10 @@ export async function clearAllForumData() {
 
 export async function clearAllLiveData() {
     await _updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, () => ({}));
+}
+
+export async function clearAllTheaterData() {
+    await _updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, () => ({}));
 }
 
 export async function clearChatHistoryForContact(contactId) {
