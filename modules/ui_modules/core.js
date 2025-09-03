@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -54,7 +53,7 @@ function _createAuxiliaryElements() {
 export async function initializeUI() {
     try {
         const body = jQuery_API(parentWin.document.body);
-        
+
         if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length > 0) {
             console.warn(`[Phone Sim] Panel already exists. Aborting UI creation.`);
             return true;
@@ -74,9 +73,9 @@ export async function initializeUI() {
         if (!templateHtml) {
             throw new Error("Fetched panel.html is empty.");
         }
-        
+
         body.append(templateHtml);
-        
+
         if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length === 0) {
              throw new Error("Panel element not found in DOM after injection.");
         }
@@ -96,9 +95,9 @@ export async function initializeUI() {
             emojiScript.src = 'https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js';
             parentWin.document.head.appendChild(emojiScript);
         }
-        
+
         body.find(`#${PhoneSim_Config.PANEL_ID}`).hide();
-        
+
         return true;
     } catch (error) {
         console.error('[Phone Sim] CRITICAL UI Initialization Failure:', error);
@@ -170,13 +169,19 @@ export function rerenderCurrentView(updates = {}) {
             UI.renderContactsList();
         }
     }
+    // [新增] 增加对欲色剧场更新的处理
+    if (updates.theaterUpdated) {
+        if(currentViewId === 'TheaterApp') {
+            UI.renderViewContent('TheaterApp');
+        }
+    }
 }
 
 export function showView(viewId, ...args) {
     if (PhoneSim_State.isNavigating) {
         return; // Navigation lock is active, ignore request.
     }
-    
+
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let targetViewId = viewId;
     let isSubViewNavigation = false;
@@ -198,7 +203,7 @@ export function showView(viewId, ...args) {
         }
         return;
     }
-    
+
     PhoneSim_State.isNavigating = true; // Engage navigation lock
 
     let options = {};
@@ -206,7 +211,7 @@ export function showView(viewId, ...args) {
     if (dataArgs.length > 0 && typeof dataArgs[0] === 'object' && dataArgs[0] !== null) {
         options = dataArgs.shift();
     }
-    
+
     // Store the active context ID in the global state
     const activeId = dataArgs[0];
     switch(viewId) {
@@ -218,10 +223,10 @@ export function showView(viewId, ...args) {
         case 'ForumPostDetail': PhoneSim_State.activeForumPostId = activeId; break;
         case 'LiveStreamList': PhoneSim_State.activeLiveBoardId = activeId; break;
         case 'LiveStreamRoom': PhoneSim_State.activeLiveStreamId = activeId; break;
-        case 'Creation': 
-            PhoneSim_State.creationContext = options.context; 
+        case 'Creation':
+            PhoneSim_State.creationContext = options.context;
             PhoneSim_State.creationBoardContext = options.boardId || null;
-            PhoneSim_State.previousView = PhoneSim_State.currentView; 
+            PhoneSim_State.previousView = PhoneSim_State.currentView;
             break;
     }
 
@@ -232,7 +237,7 @@ export function showView(viewId, ...args) {
 
     const currentLevel = parseInt(currentView.data('nav-level'), 10);
     const nextLevel = parseInt(nextView.data('nav-level'), 10);
-    
+
     let animationIn = 'fade-in', animationOut = 'fade-out';
 
     const isZoomingIn = options.animationOrigin && currentView.is('#homescreen-view');
@@ -269,13 +274,13 @@ export function showView(viewId, ...args) {
     }
 
     p.find('.view').removeClass('zoom-in zoom-out slide-in-from-right slide-in-from-left slide-out-to-right slide-out-to-left slide-out-to-bottom fade-in fade-out');
-    
+
     nextView.addClass(animationIn);
     currentView.addClass(animationOut);
 
     nextView.css('z-index', 3).addClass('active');
     currentView.css('z-index', 2);
-    
+
     const transitionDuration = (animationIn === 'zoom-in' || animationOut === 'zoom-out') ? 400 : 350;
     setTimeout(() => {
         currentView.removeClass('active').removeClass(animationOut);
@@ -287,7 +292,7 @@ export function showView(viewId, ...args) {
 
 export function renderViewContent(viewId, ...args) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    
+
     // Special case for BrowserHistory: it's a subview of BrowserApp
     if (viewId === 'BrowserHistory') {
         const browserView = p.find('#browserapp-view');
@@ -298,8 +303,8 @@ export function renderViewContent(viewId, ...args) {
     }
 
     switch(viewId) {
-        case 'HomeScreen': break; 
-        case 'ChatApp': 
+        case 'HomeScreen': break;
+        case 'ChatApp':
             UI.renderContactsList(); UI.renderContactsView(); UI.renderDiscoverView(); UI.renderMeView();
             const activeTab = PhoneSim_State.activeSubviews.chatapp || 'messages';
             p.find('#chatapp-view .subview').removeClass('active').filter(`[data-subview="${activeTab}"]`).addClass('active');
@@ -311,8 +316,8 @@ export function renderViewContent(viewId, ...args) {
         case 'GroupCreation': UI.renderGroupCreationView(); break;
         case 'Moments': UI.renderMomentsView(); break;
         case 'Homepage': UI.renderHomepage(args[0]); break;
-        case 'PhoneApp': 
-            UI.renderPhoneContactList(); 
+        case 'PhoneApp':
+            UI.renderPhoneContactList();
             UI.renderCallLogView();
             const activePhoneTab = PhoneSim_State.activeSubviews.phoneapp || 'contacts';
             p.find('#phoneapp-view .subview').removeClass('active').filter(`.phone-${activePhoneTab}-subview`).addClass('active');
@@ -329,6 +334,7 @@ export function renderViewContent(viewId, ...args) {
         case 'LiveCenterApp': UI.renderLiveBoardList(); break;
         case 'LiveStreamList': UI.renderLiveStreamList(args[0]); break;
         case 'LiveStreamRoom': UI.renderLiveStreamRoom(args[0]); break;
+        case 'TheaterApp': UI.renderTheaterView(); break; // [新增] 欲色剧场渲染入口
         case 'Creation': UI.renderCreationView(); break;
     }
 }
@@ -337,15 +343,15 @@ export function renderCreationView() {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     const form = p.find('#creation-form');
     form[0].reset();
-    
+
     const context = PhoneSim_State.creationContext;
     const boardContextId = PhoneSim_State.creationBoardContext;
 
     const title = context === 'forum' ? '创建新帖子' : '创建新直播';
     p.find('#creation-view-title').text(title);
-    
+
     const boardInput = form.find('#creation-board-input');
-    
+
     if (boardContextId) {
         const boardName = DataHandler.getBoardNameById(boardContextId, context);
         boardInput.val(boardName).prop('readonly', true).css('background-color', '#e9ecef');
