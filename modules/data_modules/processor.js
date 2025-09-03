@@ -1,12 +1,11 @@
-
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Parser } from '../parser.js';
 import { PhoneSim_Sounds } from '../sounds.js';
 import { _updateWorldbook } from './actions.js';
-import { fetchAllContacts, fetchAllEmails, fetchAllMoments, fetchAllData } from './fetch.js';
+import { fetchAllData } from './fetch.js';
 import { saveSearchResults, savePageContent } from './browserData.js';
+import { saveTheaterData } from './theaterData.js'; // [新增] 导入欲色剧场数据保存函数
 
 let TavernHelper_API, UI, DataHandler;
 
@@ -117,7 +116,7 @@ async function _handleForumCommands(commands, msgId) {
             }
             if (!postFound) console.warn(`[Phone Sim] Forum post with ID ${postId} not found for reply.`);
         });
-        
+
         // Finally, process all post updates (likes)
         postUpdates.forEach(cmd => {
              const data = cmd.data;
@@ -187,14 +186,14 @@ async function _handleMomentAndMomentUpdateCommands(momentCommands, momentUpdate
             }
 
             if (!posterContact.moments) posterContact.moments = [];
-            
+
             const newMoment = { ...cmd, timestamp: PhoneSim_Parser.buildTimestamp(cmd.time), sourceMsgId: msgId };
-            
+
             const existingIndex = posterContact.moments.findIndex(m => m.momentId === newMoment.momentId);
             if (existingIndex > -1) {
                 posterContact.moments.splice(existingIndex, 1);
             }
-            
+
             posterContact.moments.push(newMoment);
         });
 
@@ -220,7 +219,7 @@ async function _handleMomentAndMomentUpdateCommands(momentCommands, momentUpdate
                             });
                         }
                         momentFound = true;
-                        break; 
+                        break;
                     }
                 }
             }
@@ -228,7 +227,7 @@ async function _handleMomentAndMomentUpdateCommands(momentCommands, momentUpdate
                 console.warn(`[Phone Sim] Moment with ID ${cmd.动态id} not found for update. It might have been created in the same message batch.`);
             }
         });
-        
+
         // 4. Sort all moments collections
         for (const contactId in dbData) {
             if (dbData[contactId].moments) {
@@ -251,7 +250,7 @@ async function _handleChatCommands(chatCommands, msgId) {
             if (dirEntry) dirData = JSON.parse(dirEntry.content || '{}');
         } catch (e) { console.error('[Phone Sim] Failed to get contacts directory:', e); }
     }
-    
+
     await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
         const unreadDeltas = {};
         let lastTimestampByContact = {};
@@ -298,7 +297,7 @@ async function _handleChatCommands(chatCommands, msgId) {
                     dbData[contactId] = { profile: { nickname: contactId, note: '' }, app_data: { WeChat: { messages: [] } } };
                 }
             }
-            
+
             let contactObject = dbData[contactId];
             if (!contactObject) return;
             if (!isNew && p.type === '私聊' && p.profile && !dbData[contactId].profile.note) {
@@ -318,7 +317,7 @@ async function _handleChatCommands(chatCommands, msgId) {
             lastTimestampByContact[contactId] = newTimestamp;
 
             const newMessage = { uid: `${Date.now()}_${Math.random()}`, timestamp: newTimestamp, sender_id: p.senderId || p.contactId, content: p.content, sourceMsgId: msgId, isSystemNotification: p.isSystemNotification || false };
-            
+
             if (newMessage.content && (newMessage.content.type === 'transfer' || newMessage.content.type === 'red_packet')) {
                 newMessage.content.status = 'unclaimed';
             }
@@ -393,7 +392,7 @@ async function _handleFriendRequestCommands(commands) {
     });
 }
 
-export async function mainProcessor(msgId) {
+export async function mainProcessor(msgId, extraRegexes = {}) { // [修改] 增加extraRegexes参数
     UI.closeCallUI();
     const messages = TavernHelper_API.getChatMessages(msgId);
     if (!messages || !messages.length) return;
@@ -402,6 +401,27 @@ export async function mainProcessor(msgId) {
     PhoneSim_Parser.updateWorldDate(rawMessage);
     UI.updateTime();
 
+    // [新增] 处理欲色剧场数据
+    let theaterUpdated = false;
+    if (extraRegexes.yuseTheater) {
+        const theaterMatch = rawMessage.match(extraRegexes.yuseTheater);
+        if (theaterMatch) {
+            const theaterData = {
+                announcements: theaterMatch[1],
+                customizations: theaterMatch[2],
+                theater: theaterMatch[3],
+                theater_hot: theaterMatch[4],
+                theater_new: theaterMatch[5],
+                theater_recommended: theaterMatch[6],
+                theater_paid: theaterMatch[7],
+                shop: theaterMatch[8]
+            };
+            await saveTheaterData(theaterData, msgId);
+            theaterUpdated = true;
+        }
+    }
+
+
     const commands = [];
     const lines = rawMessage.split(/\r?\n/);
     lines.forEach(line => {
@@ -409,7 +429,7 @@ export async function mainProcessor(msgId) {
         if (command) commands.push(command);
     });
 
-    if (commands.length === 0) {
+    if (commands.length === 0 && !theaterUpdated) { // [修改] 增加!theaterUpdated判断
         if (msgId !== null) return;
     }
     PhoneSim_State.lastProcessedMsgId = msgId;
@@ -444,7 +464,7 @@ export async function mainProcessor(msgId) {
         await _handleProfileUpdateCommands(profileUpdateCommands);
         profileUpdated = true;
     }
-    
+
     if (browserSearchResultCommands.length > 0) {
         const searchTerm = PhoneSim_State.pendingBrowserAction?.type === 'search' ? PhoneSim_State.pendingBrowserAction.value : "搜索";
         const results = browserSearchResultCommands.map(cmd => ({
@@ -494,14 +514,14 @@ export async function mainProcessor(msgId) {
     }
 
     // A full data fetch is only needed if persistent data was changed.
-    if (chatUpdated || emailUpdated || momentsUpdated || profileUpdated || browserUpdated || forumUpdated || liveCenterUpdated) {
+    if (chatUpdated || emailUpdated || momentsUpdated || profileUpdated || browserUpdated || forumUpdated || liveCenterUpdated || theaterUpdated) { // [修改]
         await fetchAllData();
     }
-    
+
     UI.updateGlobalUnreadCounts();
 
     if (PhoneSim_State.isPanelVisible) {
-        UI.rerenderCurrentView({ chatUpdated, emailUpdated, momentsUpdated, profileUpdated, browserUpdated, forumUpdated, liveCenterUpdated });
+        UI.rerenderCurrentView({ chatUpdated, emailUpdated, momentsUpdated, profileUpdated, browserUpdated, forumUpdated, liveCenterUpdated, theaterUpdated }); // [修改]
     }
 }
 
@@ -535,7 +555,7 @@ export async function deleteMessagesBySourceId(sourceMsgId) {
 
     await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_BROWSER_DATABASE, browserDb => {
         const id = String(sourceMsgId);
-        
+
         const newHistory = [];
         for(const url of (browserDb.history || [])) {
             const page = browserDb.pages ? browserDb.pages[url] : null;
@@ -573,7 +593,7 @@ export async function deleteMessagesBySourceId(sourceMsgId) {
         }
         return forumDb;
     });
-    
+
     await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_LIVECENTER_DATABASE, liveDb => {
         const id = String(sourceMsgId);
         for (const boardId in liveDb) {
@@ -588,10 +608,19 @@ export async function deleteMessagesBySourceId(sourceMsgId) {
         return liveDb;
     });
 
+    // [新增] 删除欲色剧场数据
+    await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, theaterDb => {
+        if (theaterDb && String(theaterDb.sourceMsgId) === String(sourceMsgId)) {
+            return {}; // 如果消息ID匹配，则清空数据
+        }
+        return theaterDb; // 否则保持不变
+    });
+
+
     await fetchAllData();
 
     if (PhoneSim_State.isPanelVisible) {
-        UI.rerenderCurrentView({ chatUpdated: true, emailUpdated: true, momentsUpdated: true, browserUpdated: true, forumUpdated: true, liveCenterUpdated: true });
+        UI.rerenderCurrentView({ chatUpdated: true, emailUpdated: true, momentsUpdated: true, browserUpdated: true, forumUpdated: true, liveCenterUpdated: true, theaterUpdated: true }); // [修改]
         UI.updateGlobalUnreadCounts();
     }
 }
