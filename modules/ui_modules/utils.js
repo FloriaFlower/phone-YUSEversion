@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
@@ -30,7 +29,7 @@ export function compressImage(base64Str, maxWidth = 800, maxHeight = 1200, quali
         img.src = base64Str;
         img.onload = () => {
             let width = img.width, height = img.height;
-            if (width > height) { if (width > maxWidth) { height = Math.round(height * (maxWidth / width)); width = maxWidth; } } 
+            if (width > height) { if (width > maxWidth) { height = Math.round(height * (maxWidth / width)); width = maxWidth; } }
             else { if (height > maxHeight) { width = Math.round(width * (maxHeight / height)); height = maxHeight; } }
             const canvas = document.createElement('canvas');
             canvas.width = width; canvas.height = height;
@@ -43,7 +42,7 @@ export function compressImage(base64Str, maxWidth = 800, maxHeight = 1200, quali
 
 export function handleFileUpload(uploadType, contactId = null) {
     const fileInput = jQuery_API(parentWin.document.body).find('#phone-sim-file-input');
-    
+
     // Define the generic callback that will be used by the file input's change event
     const fileReaderCallback = (e) => {
         const fullBase64 = e.target.result;
@@ -54,7 +53,7 @@ export function handleFileUpload(uploadType, contactId = null) {
         // Clean up to prevent the same callback from firing for different upload types.
         UI.fileUploadCallback = null;
     };
-    
+
     // Set the specific action for the current upload type
     if (['playerAvatar', 'homescreenWallpaper', 'chatListWallpaper', 'chatViewWallpaper'].includes(uploadType)) {
         UI.fileUploadCallback = async (base64data) => {
@@ -74,9 +73,9 @@ export function handleFileUpload(uploadType, contactId = null) {
         UI.fileUploadCallback = (base64data) => { // Don't compress for AI
             if (contactId) {
                 DataHandler.stagePlayerMessage(
-                    contactId, 
-                    { type: 'local_image', base64: base64data }, 
-                    null, 
+                    contactId,
+                    { type: 'local_image', base64: base64data },
+                    null,
                     '[本地图片]'
                 );
             }
@@ -106,7 +105,7 @@ export function updateScaleAndPosition(shouldSave = false) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     if (!p.length) return;
 
-    const baseWidth = 376; 
+    const baseWidth = 376;
     const baseHeight = 616;
     const padding = 20;
 
@@ -122,7 +121,7 @@ export function updateScaleAndPosition(shouldSave = false) {
 
     const scaledWidth = baseWidth * scale;
     const scaledHeight = baseHeight * scale;
-    
+
     let currentPos = PhoneSim_State.panelPos;
 
     if (!currentPos) { // First load or reset
@@ -136,7 +135,7 @@ export function updateScaleAndPosition(shouldSave = false) {
 
     left = Math.max(padding / 2, Math.min(left, winWidth - scaledWidth - (padding / 2)));
     top = Math.max(padding / 2, Math.min(top, winHeight - scaledHeight - (padding / 2)));
-    
+
     const newPos = { top: `${top}px`, left: `${left}px` };
 
     p.css(newPos);
@@ -146,21 +145,22 @@ export function updateScaleAndPosition(shouldSave = false) {
     }
 }
 
-export function populateApps() { 
+export function populateApps() {
     const gridApps = [
         { v: 'BrowserApp', n: '浏览器', i: 'fa-globe', prefix: 'fas' },
         { v: 'ForumApp', n: '论坛', i: 'fa-comments', prefix: 'fas' },
         { v: 'LiveCenterApp', n: '直播中心', i: 'fa-broadcast-tower', prefix: 'fas' },
+        { v: 'TheaterApp', n: '欲色剧场', i: 'fa-film', prefix: 'fas' }, // [新增] 欲色剧场App图标
     ];
 
     const dockApps = [
-        { v: 'PhoneApp', n: '电话', i: 'fa-phone-alt', prefix: 'fas' }, 
-        { v: 'ChatApp', n: '微信', i: 'fa-weixin', prefix: 'fab' }, 
+        { v: 'PhoneApp', n: '电话', i: 'fa-phone-alt', prefix: 'fas' },
+        { v: 'ChatApp', n: '微信', i: 'fa-weixin', prefix: 'fab' },
         { v: 'EmailApp', n: '邮箱', i: 'fa-envelope', prefix: 'fas' },
         { v: 'SettingsApp', n: '设置', i: 'fa-cog', prefix: 'fas' }
-    ]; 
-    
-    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`); 
+    ];
+
+    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     const grid = p.find('.app-grid').empty();
     const dock = p.find('.dock-bar').empty();
 
@@ -185,7 +185,7 @@ export function applyCustomizations() {
     if (customization.homescreenWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-home">#${PhoneSim_Config.PANEL_ID} #homescreen-view { background-image: url(${customization.homescreenWallpaper}) !important; }</style>`);
     if (customization.chatListWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-list">#${PhoneSim_Config.PANEL_ID} .chat-list-subview { background-image: url(${customization.chatListWallpaper}) !important; }</style>`);
     if (customization.chatViewWallpaper) pHead.append(`<style id="phone-sim-wallpaper-style-chat">#${PhoneSim_Config.PANEL_ID} #chatconversation-view { background-image: url(${customization.chatViewWallpaper}) !important; }</style>`);
-    
+
     const muteSwitch = jQuery_API(parentWin.document.body).find('#mute-switch');
     if(customization.isMuted) muteSwitch.addClass('active'); else muteSwitch.removeClass('active');
 }
@@ -204,7 +204,7 @@ export function getDividerText(currentDate) {
     if (diffDays === 1) {
         return `昨天 ${timeStr}`;
     }
-    
+
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - today.getDay());
     if (msgDay >= weekStart && msgDay < today) {
@@ -258,7 +258,7 @@ export function updateGlobalUnreadCounts() {
     const chatAppBadge = jQuery_API(`${P} .app-block[data-appid="ChatApp"] .unread-badge`);
     const totalChatAppNotifications = totalUnreadChats + totalFriendRequests;
     if(totalChatAppNotifications > 0) chatAppBadge.text(totalChatAppNotifications > 99 ? '99+' : totalChatAppNotifications).show(); else chatAppBadge.hide();
-    
+
     const emailAppBadge = jQuery_API(`${P} .app-block[data-appid="EmailApp"] .unread-badge`);
     if(totalUnreadEmails > 0) emailAppBadge.text(totalUnreadEmails > 99 ? '99+' : totalUnreadEmails).show(); else emailAppBadge.hide();
 
@@ -282,7 +282,7 @@ export function makeDraggable(panel) {
         const isTouchEvent = e.type.startsWith('touch');
         if (isTouchEvent && e.originalEvent.touches.length > 1) return;
         const point = isTouchEvent ? e.originalEvent.touches[0] : e;
-        
+
         dragStartPos = { x: point.clientX, y: point.clientY };
         panelStartPos = { left: panel.position().left, top: panel.position().top };
 
@@ -293,14 +293,14 @@ export function makeDraggable(panel) {
     function handleDragMove(e) {
         const isTouchEvent = e.type.startsWith('touch');
         const point = isTouchEvent ? e.originalEvent.touches[0] : e;
-        
+
         const deltaX = point.clientX - dragStartPos.x;
         const deltaY = point.clientY - dragStartPos.y;
 
         if (!isDragging && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
             isDragging = true;
         }
-        
+
         if (isDragging) {
             e.preventDefault();
             panel.css({ left: panelStartPos.left + deltaX + 'px', top: panelStartPos.top + deltaY + 'px' });
@@ -314,7 +314,7 @@ export function makeDraggable(panel) {
             panel.css(finalPos);
             PhoneSim_State.panelPos = finalPos;
             PhoneSim_State.saveUiState();
-        } 
+        }
         isDragging = false;
     }
 
