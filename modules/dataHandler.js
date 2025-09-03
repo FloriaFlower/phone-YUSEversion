@@ -1,14 +1,12 @@
-
-
-
 import * as Processor from './data_modules/processor.js';
 import * as Actions from './data_modules/actions.js';
 import * as Fetch from './data_modules/fetch.js';
 import * as BrowserData from './data_modules/browserData.js';
 import * as ForumData from './data_modules/forumData.js';
 import * as LiveCenterData from './data_modules/liveCenterData.js';
+import * as TheaterData from './data_modules/theaterData.js'; // [新增] 导入欲色剧场数据模块
 
-const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData];
+const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData, TheaterData]; // [新增] 将欲色剧场模块添加到模块列表
 
 // Aggregate all functions from sub-modules into this single object.
 export const PhoneSim_DataHandler = {};
