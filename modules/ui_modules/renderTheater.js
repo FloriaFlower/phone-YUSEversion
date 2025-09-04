@@ -13,7 +13,7 @@ export function init(deps, dataHandler, uiObject) {
 // 主渲染函数，根据当前激活的页面调用相应的子渲染函数
 export function renderTheaterView() {
     const p = jQuery_API(parentWin.document.body).find('#phone-sim-panel-v10-0');
-    const view = p.find('#theaterapp-view');
+    const view = p.find('#theaterapp-view'); // 锁定主视图
     const activePage = PhoneSim_State.activeSubviews.theaterapp || 'announcements';
 
     // 更新底部导航栏的激活状态
@@ -79,7 +79,6 @@ function renderTheaterListPage() {
     `;
     contentArea.html(pageHtml);
 
-    // [修改] 默认加载并显示“最热”分类的内容
     renderFilteredTheaterList('hot');
 }
 
@@ -101,7 +100,6 @@ export function renderFilteredTheaterList(filterType) {
     const container = view.find('#theater-list-container');
     if (!container.length) return;
 
-    // 更新按钮的激活状态
     view.find('.theater-filters .filter-btn').removeClass('active');
     view.find(`.theater-filters .filter-btn[data-filter="${filterType}"]`).addClass('active');
 
@@ -122,7 +120,7 @@ export function renderFilteredTheaterList(filterType) {
             contentToLoad = theaterData?.theater_paid;
             break;
         default:
-            contentToLoad = theaterData?.theater_hot; // 默认返回“最热”
+            contentToLoad = theaterData?.theater_hot;
     }
 
     const trimmedContent = contentToLoad?.trim();
