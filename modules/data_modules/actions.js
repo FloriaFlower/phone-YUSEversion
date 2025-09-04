@@ -204,13 +204,13 @@ export async function addWeChatCallEndMessage(contactId, duration) {
 
 export async function initiateVoiceCall(contactId) {
     const contactName = UI._getContactName(contactId);
-    const prompt = `(系统提示：洛洛向${contactName}发起了微信语音通话...)`;
+    const prompt = `(系统提示：{{user}}向${contactName}发起了微信语音通话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
 }
 
 export async function initiatePhoneCall(callTarget) {
-    const prompt = `(系统提示：洛洛正在呼叫${callTarget.name}的电话...)`;
+    const prompt = `(系统提示：{{user}}正在呼叫${callTarget.name}的电话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
     UI.closeCallUI();
@@ -293,7 +293,7 @@ export async function commitStagedActions() {
     PhoneSim_State.stagedPlayerActions = [];
     UI.updateCommitButton();
 
-    let textPrompt = `(系统提示：洛洛刚刚在手机上进行了如下操作：\\n`;
+    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
     let hasActionsForAI = false;
 
     const finalMessagesToPersist = [];
@@ -875,3 +875,4 @@ export async function clearChatHistoryForContact(contactId) {
         return dbData;
     });
 }
+
