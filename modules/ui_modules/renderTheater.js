@@ -42,49 +42,68 @@ export function renderTheaterView() {
 // 渲染“通告列表”页面
 function renderAnnouncementsPage() {
     const contentArea = jQuery_API(parentWin.document.body).find('#theaterapp-view .app-content').empty();
-    const announcementsHtml = PhoneSim_State.yuseTheaterData?.announcements || '<div class="email-empty-state">暂无拍摄通告</div>';
-    contentArea.html(announcementsHtml);
+    const announcementsHtml = PhoneSim_State.yuseTheaterData?.announcements?.trim();
+    if (announcementsHtml) {
+        contentArea.html(announcementsHtml);
+    } else {
+        contentArea.html('<div class="email-empty-state">暂无拍摄通告</div>');
+    }
 }
 
 // 渲染“粉丝定制”页面
 function renderCustomizationsPage() {
     const contentArea = jQuery_API(parentWin.document.body).find('#theaterapp-view .app-content').empty();
-    const customizationsHtml = PhoneSim_State.yuseTheaterData?.customizations || '<div class="email-empty-state">暂无粉丝定制</div>';
-    contentArea.html(customizationsHtml);
+    const customizationsHtml = PhoneSim_State.yuseTheaterData?.customizations?.trim();
+    if (customizationsHtml) {
+        contentArea.html(customizationsHtml);
+    } else {
+        contentArea.html('<div class="email-empty-state">暂无粉丝定制</div>');
+    }
 }
 
 // 渲染“剧场列表”页面（包含筛选器）
 function renderTheaterListPage() {
     const contentArea = jQuery_API(parentWin.document.body).find('#theaterapp-view .app-content').empty();
-    const theaterListHtml = PhoneSim_State.yuseTheaterData?.theater || '<div class="email-empty-state">剧场暂未上映影片</div>';
 
     // 添加筛选器和列表容器
     const pageHtml = `
         <div class="theater-filters">
-            <button class="filter-btn" data-filter="hot">🔥 最热</button>
+            <button class="filter-btn active" data-filter="hot">🔥 最热</button>
             <button class="filter-btn" data-filter="new">🆕 最新</button>
             <button class="filter-btn" data-filter="recommended">❤️ 推荐</button>
             <button class="filter-btn" data-filter="paid">💸 高价定制</button>
-            <button class="filter-btn" data-filter="search">🔍 筛选</button>
         </div>
         <div id="theater-list-container">
-            ${theaterListHtml}
+            <!-- 内容将由 renderFilteredTheaterList 动态填充 -->
         </div>
     `;
     contentArea.html(pageHtml);
+
+    // [修改] 默认加载并显示“最热”分类的内容
+    renderFilteredTheaterList('hot');
 }
 
-// 渲染“{{user}}商城”页面
+
+// 渲染“洛洛商城”页面
 function renderShopPage() {
     const contentArea = jQuery_API(parentWin.document.body).find('#theaterapp-view .app-content').empty();
-    const shopHtml = PhoneSim_State.yuseTheaterData?.shop || '<div class="email-empty-state">商城正在补货中</div>';
-    contentArea.html(shopHtml);
+    const shopHtml = PhoneSim_State.yuseTheaterData?.shop?.trim();
+    if (shopHtml) {
+        contentArea.html(shopHtml);
+    } else {
+        contentArea.html('<div class="email-empty-state">商城正在补货中</div>');
+    }
 }
 
 // 用于根据筛选条件动态更新剧场列表的函数
 export function renderFilteredTheaterList(filterType) {
-    const container = jQuery_API(parentWin.document.body).find('#theater-list-container');
+    const view = jQuery_API(parentWin.document.body).find('#theaterapp-view');
+    const container = view.find('#theater-list-container');
     if (!container.length) return;
+
+    // 更新按钮的激活状态
+    view.find('.theater-filters .filter-btn').removeClass('active');
+    view.find(`.theater-filters .filter-btn[data-filter="${filterType}"]`).addClass('active');
 
     let contentToLoad = '';
     const theaterData = PhoneSim_State.yuseTheaterData;
@@ -103,9 +122,13 @@ export function renderFilteredTheaterList(filterType) {
             contentToLoad = theaterData?.theater_paid;
             break;
         default:
-            contentToLoad = theaterData?.theater; // 默认或未知筛选返回全部
+            contentToLoad = theaterData?.theater_hot; // 默认返回“最热”
     }
 
-    container.html(contentToLoad || '<div class="email-empty-state">该分类下暂无影片</div>');
+    const trimmedContent = contentToLoad?.trim();
+    if (trimmedContent) {
+        container.html(trimmedContent);
+    } else {
+        container.html('<div class="email-empty-state">该分类下暂无影片</div>');
+    }
 }
-
