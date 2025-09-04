@@ -12,6 +12,7 @@ export const PhoneSim_State = {
     callLogs: [],
     forumData: {},
     liveCenterData: {},
+    yuseTheaterData: {}, 
     activeContactId: null,
     activeEmailId: null,
     activeProfileId: null,
@@ -74,9 +75,9 @@ export const PhoneSim_State = {
             const s = JSON.parse(parentWindow.localStorage.getItem(PhoneSim_Config.STORAGE_KEY_UI) || '{}');
             // Selectively assign properties to avoid overwriting initialized objects
             const propertiesToLoad = [
-                'isPanelVisible', 'panelPos', 'currentView', 'activeContactId', 
-                'activeEmailId', 'activeProfileId', 'activeForumBoardId', 
-                'activeForumPostId', 'activeLiveBoardId', 'activeLiveStreamId', 
+                'isPanelVisible', 'panelPos', 'currentView', 'activeContactId',
+                'activeEmailId', 'activeProfileId', 'activeForumBoardId',
+                'activeForumPostId', 'activeLiveBoardId', 'activeLiveStreamId',
                 'activeSubviews'
             ];
             for (const prop of propertiesToLoad) {
@@ -90,8 +91,8 @@ export const PhoneSim_State = {
     },
     saveUiState: function() {
         try {
-            const stateToSave = { 
-                isPanelVisible: this.isPanelVisible, 
+            const stateToSave = {
+                isPanelVisible: this.isPanelVisible,
                 panelPos: this.panelPos,
                 currentView: this.currentView,
                 activeContactId: this.activeContactId,
