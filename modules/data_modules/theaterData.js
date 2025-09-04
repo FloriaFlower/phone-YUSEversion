@@ -18,7 +18,7 @@ export async function fetchAllTheaterData() {
             // 如果世界书为空，则加载默认样板数据
             const DEFAULT_THEATER_DATA = {
                 announcements: `
-<announcements>
+
 <div class="list-item" data-id="anno_1" data-type="announcement" data-title="【S级制作】《深海囚笼》双人水下摄影" data-description="与一线男演员温言合作，在特制水下摄影棚完成。剧情涉及人鱼主题，包含大量湿身、束缚、以及水中亲密互动。要求表现出窒息与沉溺的极致美感。拍摄周期3天，需要极佳的水性和镜头表现力。" data-actor="温言" data-location="海蓝市'深海之梦'水下摄影棚" data-payment="片酬200,000 + 15%平台分成">
   <div class="item-title">【S级制作】《深海囚笼》双人水下摄影</div>
   <div class="item-meta"><span>📍 海蓝市'深海之梦'水下摄影棚</span><span>🎬 温言</span><span class="item-tag">人鱼主题</span><span class="item-price">💰 200,000 + 15%分成</span></div>
@@ -67,10 +67,8 @@ export async function fetchAllTheaterData() {
   <div class="item-title">【暗黑童话】《小红帽与三只狼》主角</div>
   <div class="item-meta"><span>📍 森林实景拍摄地</span><span>🎬 温言, 朝刃, 顾麟</span><span class="item-tag">多人/童话改编</span><span class="item-price">💰 片酬60万 + 30%平台分红</span></div>
 </div>
-</announcements>
 `,
                 customizations: `
-<customizations>
 <div class="list-item" data-id="cust_1" data-type="customization" data-fan-id="霍" data-type-name="私人晚宴" data-request="下周五晚，在我私人府邸进行一场一对一的晚宴直播。服装由我提供，主题是'金丝雀的献礼'。直播内容很简单，只需要{{user}}全程穿着我指定的衣服，按照我的指示行动即可。不需要过度表演，自然就好。" data-deadline="下周五晚" data-payment="1,000,000" data-notes="一切开销由我承担，司机会在周五下午六点准时去接。">
   <div class="item-title">霍 的 私人晚宴 定制</div>
   <div class="item-meta"><span>⏰ 下周五晚</span><span class="item-price">💰 1,000,000</span></div>
@@ -126,10 +124,8 @@ export async function fetchAllTheaterData() {
   <div class="item-meta"><span>⏰ 今晚</span><span class="item-price">💰 200,000</span></div>
   <div class="item-actions"><button class="action-button reject-btn" data-id="cust_11">拒绝</button><button class="action-button accept-btn" data-id="cust_11">接取</button></div>
 </div>
-</customizations>
 `,
                 theater: `
-<theater>
     <div class="list-item"
         data-id="th_default_1"
         data-type="theater"
@@ -202,10 +198,8 @@ export async function fetchAllTheaterData() {
   <div class="item-title">《恶犬饲养法则》</div>
         <div class="item-meta"><span>❤️ 500.1w</span><span>⭐ 480.2w</span><span>▶️ 1500.7w</span><span class="item-price">💰 ¥2588</span></div>
     </div>
-</theater>
 `,
                 theater_hot: `
-<theater_hot>
     <div class="list-item"
         data-id="th_hot_1"
         data-type="theater"
@@ -250,10 +244,8 @@ export async function fetchAllTheaterData() {
         <div class="item-title">【强制爱】《囚笼之鸟》</div>
         <div class="item-meta"><span>❤️ 780.4w</span><span>⭐ 620.1w</span><span>▶️ 2100.8w</span><span class="item-price">💰 ¥1799</span></div>
     </div>
-</theater_hot>
 `,
                 theater_new: `
-<theater_new>
     <div class="list-item"
         data-id="th_new_1"
         data-type="theater"
@@ -283,10 +275,8 @@ export async function fetchAllTheaterData() {
   <div class="item-title">【本周上新】《办公室秘情：总裁与实习生》</div>
         <div class="item-meta"><span>❤️ 150.2w</span><span>⭐ 98.7w</span><span>▶️ 450.6w</span><span class="item-price">💰 ¥1399</span></div>
     </div>
-</theater_new>
 `,
                 theater_recommended: `
-<theater_recommended>
     <div class="list-item"
         data-id="th_rec_1"
         data-type="theater"
@@ -317,10 +307,8 @@ export async function fetchAllTheaterData() {
         <div class="item-title">【不容错过】《我的变态邻居》</div>
         <div class="item-meta"><span>❤️ 666.6w</span><span>⭐ 555.5w</span><span>▶️ 1984.0w</span><span class="item-price">💰 ¥1666</span></div>
     </div>
-</theater_recommended>
 `,
                 theater_paid: `
-<theater_paid>
     <div class="list-item"
         data-id="th_paid_1"
         data-type="theater"
@@ -351,10 +339,8 @@ export async function fetchAllTheaterData() {
         <div class="item-title">【X-File绝密档案】《数据飞升》</div>
         <div class="item-meta"><span>❤️ 87.4w</span><span>⭐ 85.3w</span><span>▶️ 250.1w</span><span class="item-price">💰 ¥666666</span></div>
     </div>
-</theater_paid>
 `,
                 shop: `
-(<shop>
 <div class="list-item" data-id="shop_1" data-type="shop" data-name="【{{user}}原味】《沉沦的家庭教师》黑框眼镜" data-description="在《沉沦的家庭教师》中被朝刃操到歪掉的那副黑框眼镜。镜片上有已经干涸的可疑水渍，镜腿上有被汗水浸湿的痕迹。据说戴上它，就能感受到被年轻肉体支配的羞耻与快乐。" d)ata-tags='["原味", "道具", "制服系列"]'
         data-price="¥5000"
         data-highest-bid="¥88888"
@@ -387,7 +373,6 @@ export async function fetchAllTheaterData() {
   <div class="item-title">主播录制ASMR用的同款麦克风（已开光）</div>
   <div class="item-meta"><span class="item-tag">设备</span><span class="item-price">💰 ¥15000</span></div>
 </div>
-</shop>
 `,
             };
             PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
