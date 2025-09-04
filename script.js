@@ -13,7 +13,7 @@ let mainProcessorTimeout;
 let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
 // Regex for Yuse Theater App
-const yuseTheaterRegex = /<yuse_data>.*?<announcements>(.*?)<\/announcements>.*?<customizations>(.*?)<\/customizations>.*?<theater>(.*?)<\/theater>.*?<theater_hot>(.*?)<\/theater_hot>.*?<theater_new>(.*?)<\/theater_new>.*?<theater_recommended>(.*?)<\/theater_recommended>.*?<theater_paid>(.*?)<\/theater_paid>.*?<shop>(.*?)<\/shop>.*?<\/yuse_data>/s;
+const yuseTheaterRegex = /<yuse_data>[\s\S]*?<announcements>([\s\S]*?)<\/announcements>[\s\S]*?<customizations>([\s\S]*?)<\/customizations>[\s\S]*?<theater>([\s\S]*?)<\/theater>[\s\S]*?<theater_hot>([\s\S]*?)<\/theater_hot>[\s\S]*?<theater_new>([\s\S]*?)<\/theater_new>[\s\S]*?<theater_recommended>([\s\S]*?)<\/theater_recommended>[\s\S]*?<theater_paid>([\s\S]*?)<\/theater_paid>[\s\S]*?<shop>([\s\S]*?)<\/shop>[\s\S]*?<\/yuse_data>/s;
 
 
 function onSettingChanged() {
@@ -73,14 +73,16 @@ async function mainInitialize() {
 
     PhoneSim_Sounds.init(PhoneSim_State);
 
-    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
-    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
+    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI, PhoneSim_DataHandler);
+    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler, PhoneSim_UI);
 
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
         console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
         return;
     }
+
+    await PhoneSim_DataHandler.fetchAllData();
 
     const e = SillyTavern_Context.eventTypes;
     SillyTavern_Context.eventSource.on(e.MESSAGE_EDITED, (id) => debouncedMainProcessor(id));
