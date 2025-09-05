@@ -28,12 +28,12 @@ modules.forEach(module => {
 PhoneSim_UI.init = (dependencies, dataHandler) => {
     modules.forEach(module => {
         if (typeof module.init === 'function') {
-            // [最终修正] 确保UI模块自身也被传递下去
             module.init(dependencies, dataHandler, PhoneSim_UI);
         }
     });
 };
 
+// 【凤凰神经】这里是关键：我们确保调用的是我们100%可靠的骨架加载器
 PhoneSim_UI.initializeUI = async function() {
     return await Core.initializeUI();
 };
