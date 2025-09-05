@@ -49,52 +49,38 @@ function _createAuxiliaryElements() {
     jQuery_API(parentWin.document.body).append(dialogHtml);
 }
 
-
 export async function initializeUI() {
     try {
         const body = jQuery_API(parentWin.document.body);
-
-        if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length > 0) {
-            console.warn(`[Phone Sim] Panel already exists. Aborting UI creation.`);
-            return true;
-        }
+        if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length > 0) return true;
 
         const coreJsUrl = new URL(import.meta.url);
         const basePath = coreJsUrl.pathname.substring(0, coreJsUrl.pathname.lastIndexOf('/modules/ui_modules'));
         const panelUrl = `${basePath}/panel.html`;
 
-        console.log(`[Phone Sim] Fetching panel from: ${panelUrl}`);
+        console.log(`[Phone Sim] Genesis Protocol: Fetching panel from stable URL: ${panelUrl}`);
         const response = await fetch(panelUrl);
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch panel.html: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
         const templateHtml = await response.text();
-        if (!templateHtml) {
-            throw new Error("Fetched panel.html is empty.");
-        }
+        if (!templateHtml) throw new Error("Fetched panel is empty.");
 
         body.append(templateHtml);
 
-        if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length === 0) {
-             throw new Error("Panel element not found in DOM after injection.");
-        }
-
-        _createToggleButton();
-        _createAuxiliaryElements();
-
-        UI.populateApps();
-        UI.renderStickerPicker();
+        // UI加载成功后的所有后续操作
+        UI.createToggleButton();
         UI.applyCustomizations();
         UI.addEventListeners();
+        UI.populateApps();
         UI.updateScaleAndPosition();
 
-        if (parentWin.document.readyState === "complete") {
-            const emojiScript = document.createElement('script');
-            emojiScript.type = 'module';
-            emojiScript.src = 'https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js';
-            parentWin.document.head.appendChild(emojiScript);
-        }
+        console.log('%c[Phone Sim] Genesis UI Core successfully built.', 'color: #00BCD4; font-weight: bold;');
+        return true;
+    } catch (error) {
+        console.error('[Phone Sim] CRITICAL UI Initialization Failure:', error);
+        parentWin.toastr.error('手机模拟器UI加载失败，请检查控制台获取详细信息。', '严重错误');
+        return false;
+    }
+}
 
         body.find(`#${PhoneSim_Config.PANEL_ID}`).hide();
 
