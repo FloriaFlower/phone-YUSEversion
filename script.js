@@ -6,7 +6,7 @@ import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v17.1-Phoenix]';
+const loggingPrefix = '[手机模拟器 v17.2-FinalGenesis]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
@@ -41,16 +41,19 @@ function addSettingsHtml() {
             </div>
         </div>
     </div>`;
-    jQuery_API("#extensions_settings2").append(settingsHtml);
+    // 防止重复添加
+    if (jQuery_API("#phone_simulator_enabled").length === 0) {
+        jQuery_API("#extensions_settings2").append(settingsHtml);
+    }
     jQuery_API("#phone_simulator_enabled").prop("checked", PhoneSim_State.customization.enabled);
-    jQuery_API("#phone_simulator_enabled").on("change", onSettingChanged);
+    jQuery_API("#phone_simulator_enabled").off('change').on("change", onSettingChanged);
 }
 
 const debouncedMainProcessor = (msgId) => {
     clearTimeout(mainProcessorTimeout);
     mainProcessorTimeout = setTimeout(() => {
         PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
-    }, 250);
+    }, 500); // 增加延迟以确保DOM完全更新
 };
 
 async function mainInitialize() {
@@ -63,10 +66,15 @@ async function mainInitialize() {
         win: parentWin
     };
 
-    PhoneSim_State.loadUiState();
-    PhoneSim_Sounds.init(PhoneSim_State);
+    // 【最终圣典修正】
+    // 这是我们斩断死锁的关键。
+    // 我们确保数据工匠(DataHandler)和界面工匠(UI)都直接从我们这里接收指令，
+    // 而不是互相等待对方。他们将携手并行，共同创造。
     PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
     PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
+
+    PhoneSim_State.loadUiState();
+    PhoneSim_Sounds.init(PhoneSim_State);
 
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
@@ -74,7 +82,6 @@ async function mainInitialize() {
         return;
     }
 
-    // 确保在绑定事件前加载一次初始数据
     await PhoneSim_DataHandler.fetchAllData();
 
     const e = SillyTavern_Context.eventTypes;
@@ -87,10 +94,10 @@ async function mainInitialize() {
     });
 
     if (PhoneSim_State.isPanelVisible) {
-        PhoneSim_UI.togglePanel(true);
+        PhoneSim_UI.togglePanel(true, true); // 强制在初始加载时执行
     }
 
-    console.log(`%c${loggingPrefix} Phoenix Engine Initialized and running.`, 'color: #ff9800; font-weight: bold;');
+    console.log(`%c${loggingPrefix} Final Genesis Engine Initialized and running.`, 'color: #4A148C; font-weight: bold;');
 }
 
 function areCoreApisReady() {
@@ -101,7 +108,7 @@ function areCoreApisReady() {
     return !!(SillyTavern_Context && TavernHelper_API && jQuery_API &&
         SillyTavern_Context.eventSource && typeof SillyTavern_Context.eventSource.on === 'function' &&
         SillyTavern_Context.eventTypes &&
-        jQuery_API("#extensions_settings2").length > 0 && // 确保设置面板已存在
+        jQuery_API("#extensions_settings2").length > 0 &&
         typeof TavernHelper_API.getWorldbook === 'function');
 }
 
@@ -111,7 +118,7 @@ let apiReadyInterval = setInterval(() => {
 
         PhoneSim_State.init(parentWin);
         PhoneSim_State.loadCustomization();
-        addSettingsHtml(); // 创建设置开关
+        addSettingsHtml();
 
         if (PhoneSim_State.customization.enabled) {
             mainInitialize();
