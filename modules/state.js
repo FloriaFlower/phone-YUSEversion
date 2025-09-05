@@ -3,6 +3,9 @@ import { PhoneSim_Config } from '../config.js';
 let parentWindow;
 
 export const PhoneSim_State = {
+    // 【新增】我们存放黄金坐标的宝箱
+    basePath: '',
+
     isNavigating: false, // Prevents concurrent navigation actions
     isPanelVisible: false,
     panelPos: null,
@@ -12,7 +15,7 @@ export const PhoneSim_State = {
     callLogs: [],
     forumData: {},
     liveCenterData: {},
-    yuseTheaterData: {}, 
+    yuseTheaterData: {},
     activeContactId: null,
     activeEmailId: null,
     activeProfileId: null,
