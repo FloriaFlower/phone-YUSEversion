@@ -4,38 +4,26 @@ import * as Fetch from './data_modules/fetch.js';
 import * as BrowserData from './data_modules/browserData.js';
 import * as ForumData from './data_modules/forumData.js';
 import * as LiveCenterData from './data_modules/liveCenterData.js';
-import * as TheaterData from './data_modules/theaterData.js'; // [新增] 导入欲色剧场数据模块
+import * as TheaterData from './data_modules/theaterData.js';
 
-const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData, TheaterData]; // [新增] 将欲色剧场模块添加到模块列表
+const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData, TheaterData];
 
-// Aggregate all functions from sub-modules into this single object.
 export const PhoneSim_DataHandler = {};
 
-// Manually export key functions for inter-module dependency
 export { getOrCreatePhoneLorebook, clearLorebookCache } from './data_modules/actions.js';
 
-
-// Combine functions from each module into the main handler object.
 modules.forEach(module => {
     Object.keys(module).forEach(key => {
-        // We only add functions, and avoid overwriting the init function we'll define below.
         if (typeof module[key] === 'function' && key !== 'init') {
             PhoneSim_DataHandler[key] = module[key];
         }
     });
 });
 
-
-/**
- * Initializes all sub-modules with necessary dependencies, including the UI handler.
- * This is called from the main script after both UI and Data handlers are fully constructed.
- * @param {object} dependencies - Core APIs (SillyTavern, jQuery, etc.).
- * @param {object} uiHandler - The fully constructed UI handler object.
- */
 PhoneSim_DataHandler.init = (dependencies, uiHandler) => {
     modules.forEach(module => {
         if (typeof module.init === 'function') {
-            // Pass dependencies, the UI handler, and a reference to the complete Data handler itself.
+            // [修改] 确保数据处理器自身也被传递下去，解决循环依赖
             module.init(dependencies, uiHandler, PhoneSim_DataHandler);
         }
     });
