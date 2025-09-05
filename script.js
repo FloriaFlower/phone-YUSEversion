@@ -6,51 +6,13 @@ import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v17.0-Genesis]';
+const loggingPrefix = '[手机模拟器 v17.1-Phoenix]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
-let SillyTavern_Context, jQuery_API;
-let chatObserver; // 我们的新心跳
+let mainProcessorTimeout;
+let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
-// 我们不再需要SillyTavern的事件处理器了，我们自己创造
-function observeChatMessages() {
-    const chatElement = parentWin.document.getElementById('chat');
-    if (!chatElement) {
-        console.warn(`${loggingPrefix} Chat element not found. Retrying...`);
-        setTimeout(observeChatMessages, 500);
-        return;
-    }
-
-    // 神之心：一个强大的观察者，监视着每一次聊天内容的变动
-    chatObserver = new MutationObserver((mutationsList) => {
-        for (const mutation of mutationsList) {
-            // 我们只关心新消息的添加
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                mutation.addedNodes.forEach(node => {
-                    // 确保是消息元素节点
-                    if (node.nodeType === 1 && node.classList.contains('mes')) {
-                        const lastMessage = jQuery_API(node);
-                        const messageBlock = lastMessage.children('.mes_block'); // 目标是 .mes_block
-                        const messageId = messageBlock.attr('mesid');
-
-                        // 确保找到了 messageId
-                        if (messageId) {
-                             console.log(`%c${loggingPrefix} New message detected via Genesis Heartbeat, ID: ${messageId}`, 'color: #7B1FA2;');
-                            // 我们给予一小段延迟，确保SillyTavern完全渲染好DOM
-                            setTimeout(() => {
-                                PhoneSim_DataHandler.processMessageById(parseInt(messageId));
-                            }, 100);
-                        }
-                    }
-                });
-            }
-        }
-    });
-
-    chatObserver.observe(chatElement, { childList: true }); // 我们只需要观察直接子节点的添加
-    console.log(`%c${loggingPrefix} Genesis Heartbeat (MutationObserver) is now active.`, 'color: #7B1FA2; font-weight: bold;');
-}
-
+const yuseTheaterRegex = /<yuse_data>[\s\S]*?<announcements>([\s\S]*?)<\/announcements>[\s\S]*?<customizations>([\s\S]*?)<\/customizations>[\s\S]*?<theater>([\s\S]*?)<\/theater>[\s\S]*?<theater_hot>([\s\S]*?)<\/theater_hot>[\s\S]*?<theater_new>([\s\S]*?)<\/theater_new>[\s\S]*?<theater_recommended>([\s\S]*?)<\/theater_recommended>[\s\S]*?<theater_paid>([\s\S]*?)<\/theater_paid>[\s\S]*?<shop>([\s\S]*?)<\/shop>[\s\S]*?<\/yuse_data>/s;
 
 function onSettingChanged() {
     PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
@@ -84,10 +46,19 @@ function addSettingsHtml() {
     jQuery_API("#phone_simulator_enabled").on("change", onSettingChanged);
 }
 
+const debouncedMainProcessor = (msgId) => {
+    clearTimeout(mainProcessorTimeout);
+    mainProcessorTimeout = setTimeout(() => {
+        PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
+    }, 250);
+};
+
 async function mainInitialize() {
     console.log(`%c${loggingPrefix} Core APIs ready. Initializing...`, 'color: #4CAF50; font-weight: bold;');
+
     const dependencies = {
         st_context: SillyTavern_Context,
+        th: TavernHelper_API,
         jq: jQuery_API,
         win: parentWin
     };
@@ -103,33 +74,36 @@ async function mainInitialize() {
         return;
     }
 
+    // 确保在绑定事件前加载一次初始数据
     await PhoneSim_DataHandler.fetchAllData();
 
-    // 我们不再依赖SillyTavern的事件，而是启动我们自己的观察者
-    observeChatMessages();
-
-    // CHAT_CHANGED 仍然有用，用于切换聊天时的重置
-    SillyTavern_Context.eventSource.on(SillyTavern_Context.eventTypes.CHAT_CHANGED, ()=> {
+    const e = SillyTavern_Context.eventTypes;
+    SillyTavern_Context.eventSource.on(e.MESSAGE_EDITED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_RECEIVED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_DELETED, (id) => PhoneSim_DataHandler.deleteMessagesBySourceId(id));
+    SillyTavern_Context.eventSource.on(e.CHAT_CHANGED, ()=> {
          PhoneSim_DataHandler.clearLorebookCache();
          if(PhoneSim_State.isPanelVisible) PhoneSim_DataHandler.fetchAllData();
     });
 
-    if (PhoneSim_State.isPanelVisible) PhoneSim_UI.togglePanel(true);
-    console.log(`%c${loggingPrefix} Genesis Engine Initialized.`, 'color: #4CAF50; font-weight: bold;');
-}
+    if (PhoneSim_State.isPanelVisible) {
+        PhoneSim_UI.togglePanel(true);
+    }
 
+    console.log(`%c${loggingPrefix} Phoenix Engine Initialized and running.`, 'color: #ff9800; font-weight: bold;');
+}
 
 function areCoreApisReady() {
     SillyTavern_Context = (parentWin.SillyTavern && parentWin.SillyTavern.getContext) ? parentWin.SillyTavern.getContext() : null;
+    TavernHelper_API = parentWin.TavernHelper;
     jQuery_API = parentWin.jQuery;
 
-    return !!(SillyTavern_Context && jQuery_API &&
+    return !!(SillyTavern_Context && TavernHelper_API && jQuery_API &&
         SillyTavern_Context.eventSource && typeof SillyTavern_Context.eventSource.on === 'function' &&
         SillyTavern_Context.eventTypes &&
-        typeof jQuery_API.fn.append === 'function' &&
-        typeof SillyTavern_Context.chat !== 'undefined');
+        jQuery_API("#extensions_settings2").length > 0 && // 确保设置面板已存在
+        typeof TavernHelper_API.getWorldbook === 'function');
 }
-
 
 let apiReadyInterval = setInterval(() => {
     if (areCoreApisReady()) {
@@ -137,12 +111,12 @@ let apiReadyInterval = setInterval(() => {
 
         PhoneSim_State.init(parentWin);
         PhoneSim_State.loadCustomization();
-        addSettingsHtml();
+        addSettingsHtml(); // 创建设置开关
 
         if (PhoneSim_State.customization.enabled) {
             mainInitialize();
         } else {
-            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800 ;');
+            console.log(`%c${loggingPrefix} Extension is disabled.`, 'color: #9E9E9E;');
         }
     }
-}, 100);
+}, 200);
