@@ -18,7 +18,7 @@ const yuseTheaterRegex = /<yuse_data>[\s\S]*?<announcements>([\s\S]*?)<\/announc
 
 function onSettingChanged() {
     PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
-    PhoneSim_State.saveCustomization(); // Use the new centralized save function
+    PhoneSim_State.saveCustomization();
     if (parentWin.toastr) {
         parentWin.toastr.info('设置已保存。刷新页面以应用更改。', '手机模拟器');
     }
@@ -51,7 +51,6 @@ function addSettingsHtml() {
 const debouncedMainProcessor = (msgId) => {
     clearTimeout(mainProcessorTimeout);
     mainProcessorTimeout = setTimeout(() => {
-        // Pass the new regex to the main processor
         PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
     }, 250);
 };
@@ -67,14 +66,11 @@ async function mainInitialize() {
         win: parentWin
     };
 
-    // State is already initialized and customization loaded in the interval
-    // Load the rest of the UI state now that we know the extension is enabled.
     PhoneSim_State.loadUiState();
-
     PhoneSim_Sounds.init(PhoneSim_State);
 
-    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI, PhoneSim_DataHandler);
-    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler, PhoneSim_UI);
+    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
+    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
 
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
@@ -82,6 +78,7 @@ async function mainInitialize() {
         return;
     }
 
+    // [修改] fetchAllData会触发所有数据的加载，包括欲色剧场
     await PhoneSim_DataHandler.fetchAllData();
 
     const e = SillyTavern_Context.eventTypes;
@@ -117,10 +114,8 @@ let apiReadyInterval = setInterval(() => {
     if (areCoreApisReady()) {
         clearInterval(apiReadyInterval);
 
-        // CRITICAL ORDER: Init state, load customization (which includes 'enabled'), THEN add HTML and check the flag.
         PhoneSim_State.init(parentWin);
         PhoneSim_State.loadCustomization();
-
         addSettingsHtml();
 
         if (PhoneSim_State.customization.enabled) {
