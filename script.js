@@ -2,11 +2,10 @@ import { PhoneSim_UI } from './modules/ui.js';
 import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
 import { PhoneSim_Sounds } from './modules/sounds.js';
-import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v17.2-FinalGenesis]';
+const loggingPrefix = '[手机模拟器 v18.0-GPS]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
@@ -41,19 +40,16 @@ function addSettingsHtml() {
             </div>
         </div>
     </div>`;
-    // 防止重复添加
-    if (jQuery_API("#phone_simulator_enabled").length === 0) {
-        jQuery_API("#extensions_settings2").append(settingsHtml);
-    }
+    jQuery_API("#extensions_settings2").append(settingsHtml);
     jQuery_API("#phone_simulator_enabled").prop("checked", PhoneSim_State.customization.enabled);
-    jQuery_API("#phone_simulator_enabled").off('change').on("change", onSettingChanged);
+    jQuery_API("#phone_simulator_enabled").on("change", onSettingChanged);
 }
 
 const debouncedMainProcessor = (msgId) => {
     clearTimeout(mainProcessorTimeout);
     mainProcessorTimeout = setTimeout(() => {
         PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
-    }, 500); // 增加延迟以确保DOM完全更新
+    }, 250);
 };
 
 async function mainInitialize() {
@@ -66,15 +62,10 @@ async function mainInitialize() {
         win: parentWin
     };
 
-    // 【最终圣典修正】
-    // 这是我们斩断死锁的关键。
-    // 我们确保数据工匠(DataHandler)和界面工匠(UI)都直接从我们这里接收指令，
-    // 而不是互相等待对方。他们将携手并行，共同创造。
-    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
-    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
-
     PhoneSim_State.loadUiState();
     PhoneSim_Sounds.init(PhoneSim_State);
+    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
+    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
 
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
@@ -94,10 +85,10 @@ async function mainInitialize() {
     });
 
     if (PhoneSim_State.isPanelVisible) {
-        PhoneSim_UI.togglePanel(true, true); // 强制在初始加载时执行
+        PhoneSim_UI.togglePanel(true);
     }
 
-    console.log(`%c${loggingPrefix} Final Genesis Engine Initialized and running.`, 'color: #4A148C; font-weight: bold;');
+    console.log(`%c${loggingPrefix} GPS Navigation System Online.`, 'color: #ff9800; font-weight: bold;');
 }
 
 function areCoreApisReady() {
@@ -117,6 +108,20 @@ let apiReadyInterval = setInterval(() => {
         clearInterval(apiReadyInterval);
 
         PhoneSim_State.init(parentWin);
+
+        // 【GPS接收器】
+        // 在一切开始之前，我们首先定位自己
+        if (document.currentScript && document.currentScript.src) {
+            const scriptUrl = new URL(document.currentScript.src);
+            const path = scriptUrl.pathname;
+            PhoneSim_State.basePath = path.substring(0, path.lastIndexOf('/'));
+            console.log(`${loggingPrefix} GPS lock acquired. Base path set to: ${PhoneSim_State.basePath}`);
+        } else {
+             console.error(`${loggingPrefix} CRITICAL: Could not determine base path via document.currentScript.src.`);
+             parentWin.toastr.error('无法定位插件资源路径。', '手机模拟器致命错误');
+             return;
+        }
+
         PhoneSim_State.loadCustomization();
         addSettingsHtml();
 
