@@ -1,4 +1,3 @@
-
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -29,6 +28,86 @@ export function getStreamListSkeleton() {
     </div>`;
 }
 
+export function showTheaterModal(itemData) {
+    const p = jQuery_API(parentWin.document.body);
+    const modal = p.find('#theater-modal');
+
+    // Sanitize and prepare content
+    const title = jQuery_API('<div>').text(itemData.title || '').html();
+    const typeName = jQuery_API('<div>').text(itemData.typeName || '').html();
+
+    let headerHtml = `<h2>${title}</h2><button class="theater-modal-close-btn">×</button>`;
+    if (itemData.type === 'customization') {
+        headerHtml = `<h2>${typeName} 定制详情</h2><button class="theater-modal-close-btn">×</button>`;
+    }
+
+    let bodyHtml = '';
+    switch (itemData.type) {
+        case 'announcement':
+            bodyHtml = `
+                <div class="modal-section"><h4>🎬 合作演员</h4><p>${itemData.actor}</p></div>
+                <div class="modal-section"><h4>📍 拍摄地点</h4><p>${itemData.location}</p></div>
+                <div class="modal-section"><h4>💰 酬劳</h4><p>${itemData.payment}</p></div>
+                <div class="modal-section description"><h4>📝 拍摄说明</h4><p>${itemData.description}</p></div>
+            `;
+            break;
+        case 'customization':
+             bodyHtml = `
+                <div class="modal-section"><h4>💖 粉丝ID</h4><p>${itemData.fanId}</p></div>
+                <div class="modal-section"><h4>⏰ 截止日期</h4><p>${itemData.deadline}</p></div>
+                <div class="modal-section"><h4>💰 酬劳</h4><p>${itemData.payment}</p></div>
+                <div class="modal-section description"><h4>📝 定制要求</h4><p>${itemData.request}</p></div>
+                ${itemData.notes ? `<div class="modal-section"><h4>备注</h4><p>${itemData.notes}</p></div>` : ''}
+            `;
+            break;
+        case 'theater':
+            const reviews = itemData.reviews ? JSON.parse(itemData.reviews) : [];
+            const reviewsHtml = reviews.map(r => `<div class="review-item"><b>${jQuery_API('<div>').text(r.user).html()}:</b> <p>${jQuery_API('<div>').text(r.text).html()}</p></div>`).join('');
+            bodyHtml = `
+                <div class="modal-theater-top">
+                    <img src="${itemData.cover}" class="modal-cover-image">
+                    <div class="modal-theater-meta">
+                        <span>❤️ ${itemData.popularity}</span>
+                        <span>⭐ ${itemData.favorites}</span>
+                        <span>▶️ ${itemData.views}</span>
+                        <span class="item-price">💰 ${itemData.price}</span>
+                    </div>
+                </div>
+                <div class="modal-section description"><h4>剧情简介</h4><p>${itemData.description}</p></div>
+                <div class="modal-section reviews"><h4>热门评论</h4><div class="reviews-container">${reviewsHtml}</div></div>
+            `;
+            break;
+        case 'shop':
+             const comments = itemData.comments ? JSON.parse(itemData.comments) : [];
+             const commentsHtml = comments.map(c => `<div class="review-item"><b>${jQuery_API('<div>').text(c.user).html()}:</b> <p>${jQuery_API('<div>').text(c.text).html()}</p></div>`).join('');
+             bodyHtml = `
+                <div class="modal-section"><h4>💰 起拍价</h4><p>${itemData.price}</p></div>
+                <div class="modal-section"><h4>🔥 当前最高出价</h4><p>${itemData.highestBid}</p></div>
+                <div class="modal-section description"><h4>📝 商品描述</h4><p>${itemData.description}</p></div>
+                <div class="modal-section reviews"><h4>评论区</h4><div class="reviews-container">${commentsHtml}</div></div>
+            `;
+            break;
+    }
+
+    let footerHtml = `<button class="modal-action-btn" data-id="${itemData.id}">关闭</button>`;
+    if (itemData.type === 'announcement') {
+        footerHtml = `<button class="modal-action-btn accept-btn" data-id="${itemData.id}">接受通告</button>`;
+    } else if (itemData.type === 'customization') {
+        footerHtml = `<button class="modal-action-btn reject-btn" data-id="${itemData.id}">拒绝</button><button class="modal-action-btn accept-btn" data-id="${itemData.id}">接取</button>`;
+    } else if (itemData.type === 'shop') {
+        footerHtml = `<input type="number" class="bid-input" placeholder="输入您的出价"><button class="modal-action-btn bid-btn" data-id="${itemData.id}">出价</button>`;
+    } else if (itemData.type === 'theater'){
+        footerHtml = `<button class="modal-action-btn buy-btn" data-id="${itemData.id}">购买影片</button>`;
+    }
+
+    modal.find('.theater-modal-header').html(headerHtml);
+    modal.find('.theater-modal-body').html(bodyHtml);
+    modal.find('.theater-modal-footer').html(footerHtml);
+
+    modal.fadeIn(200);
+}
+
+
 export function renderInteractiveMessage(message) {
     const { requestData, uid } = message;
     if (!requestData || requestData.type !== 'friend_request') {
@@ -36,7 +115,7 @@ export function renderInteractiveMessage(message) {
     }
 
     const { from_id, from_name, status } = requestData;
-    
+
     let actionsHtml = '';
     if (status === 'pending') {
         actionsHtml = `
@@ -62,13 +141,6 @@ export function renderInteractiveMessage(message) {
         </div>`;
 }
 
-/**
- * Renders any type of content (string, object, or array) into its corresponding HTML representation for display.
- * This is the single source of truth for all content rendering.
- * @param {*} content - The content to render.
- * @param {object} context - Contextual options, e.g., { isMoment: true }.
- * @returns {string} - The generated HTML string.
- */
 export function renderRichContent(content, context = {}) {
     const { isMoment = false, uid = '' } = context;
     const sanitize = (text) => jQuery_API('<div>').text(text).html();
@@ -78,7 +150,7 @@ export function renderRichContent(content, context = {}) {
         if (parsed !== content) {
             return UI.renderRichContent(parsed, context);
         }
-        
+
         const downloadLinkRegex = /\[([^\]]+)\]\(([^|]+)\|([^)]+)\)/g;
         let processedText = sanitize(content).replace(/\\n/g, '<br>');
         processedText = processedText.replace(downloadLinkRegex, (match, linkText, fileName, description) => {
@@ -86,7 +158,7 @@ export function renderRichContent(content, context = {}) {
         });
         return processedText;
     }
-    
+
     if (Array.isArray(content)) {
         return `<div class="mixed-content">${content.map(p => UI.renderRichContent(p, context)).join('')}</div>`;
     }
@@ -108,9 +180,9 @@ export function renderRichContent(content, context = {}) {
                             <div class="pseudo-image-cover"><i class="fas fa-image"></i> [图片] 点击查看</div>
                             <div class="pseudo-image-text" style="display:none;">${text}</div>
                         </div>`;
-            case 'voice': 
+            case 'voice':
                 return `<div class="rich-message voice-message" data-text="${sanitize(content.text)}"><div class="voice-bar"><div class="voice-wave"><span></span><span></span><span></span><span></span></div><span class="voice-duration">${sanitize(content.duration)}</span></div><div class="voice-transcript">${sanitize(content.text)}</div></div>`;
-            case 'transfer': 
+            case 'transfer':
             case 'red_packet':
                 const isRedPacket = content.type === 'red_packet';
                 const isClaimed = content.status === 'claimed';
@@ -118,7 +190,7 @@ export function renderRichContent(content, context = {}) {
                 const className = `${content.type} ${isClaimed ? 'claimed' : 'unclaimed'}`;
                 const footerText = isRedPacket ? '微信红包' : '微信转账';
                 const iconSvg = isRedPacket ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20,6H4V4H20V6M20,12H4V8H20V12M18,14H6A2,2 0 0,0 4,16V19A2,2 0 0,0 6,21H18A2,2 0 0,0 20,19V16A2,2 0 0,0 18,14Z"></path></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5"><path d="M12 2v20M5 8h14M5 14h14"/></svg>`;
-                
+
                 let primaryText, secondaryText;
                 if (isRedPacket) {
                     primaryText = sanitize(content.note || '恭喜发财，大吉大利');
@@ -127,7 +199,7 @@ export function renderRichContent(content, context = {}) {
                     primaryText = `￥${sanitize(content.amount)}`;
                     secondaryText = statusText;
                 }
-                
+
                 return `<div class="rich-message transfer-message ${className}" data-uid="${uid}">
                             <div class="transfer-inner">
                                 <div class="transfer-icon">${iconSvg}</div>
@@ -166,7 +238,7 @@ export function renderSystemMessage(message) {
     } else {
         textContent = jQuery_API('<div>').text(content).html();
     }
-    
+
     return `<div class="message system-notification" data-uid="${uid}"><span>${textContent}</span></div>`;
 }
 
@@ -174,7 +246,7 @@ export function renderSystemMessage(message) {
 export function renderSingleMessage(s, isGroup) {
     const isPlayer = s.sender_id === PhoneSim_Config.PLAYER_ID;
     const senderName = UI._getContactName(s.sender_id);
-    
+
     if (s.recalled) {
         const recalledBy = isPlayer ? '你' : senderName;
         const recalledText = `${recalledBy}撤回了一条消息`;
@@ -182,14 +254,14 @@ export function renderSingleMessage(s, isGroup) {
     }
 
     const senderContact = PhoneSim_State.contacts[s.sender_id];
-    const senderAvatar = isPlayer 
-        ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar('我')) 
+    const senderAvatar = isPlayer
+        ? (PhoneSim_State.customization.playerAvatar || UI.generateDefaultAvatar('我'))
         : (senderContact?.profile?.avatar || UI.generateDefaultAvatar(senderName));
-        
+
     const contentHtml = renderRichContent(s.content, { uid: s.uid });
-    
+
     let messageClass = `message ${isPlayer ? 'sent' : 'received'} ${s.isStaged ? 'staged' : ''}`;
-    
+
     const messageActionsHtml = `<div class="message-actions" data-message-uid="${s.uid}" title="更多操作"><i class="fas fa-ellipsis-h"></i></div>`;
     const avatarHtml = `<div class="avatar-container"><img src="${senderAvatar}" class="avatar clickable-avatar" data-contact-id="${s.sender_id}"></div>`;
     const statusHtml = isPlayer && s.isStaged ? `<div class="message-status"><i class="fas fa-clock" title="发送中"></i></div>` : '';
@@ -223,9 +295,9 @@ export function showTransactionModal(message) {
     const sender = PhoneSim_State.contacts[message.sender_id];
     const senderName = sender ? (sender.profile.note || sender.profile.nickname) : '未知';
     const isRedPacket = content.type === 'red_packet';
-    
+
     const modal = p.find(isRedPacket ? '#phone-sim-red-packet-modal' : '#phone-sim-transfer-modal');
-    
+
     if (isRedPacket) {
         modal.find('.red-packet-sender').text(`${senderName}的红包`);
         modal.find('.red-packet-note').text(content.note || '恭喜发财，大吉大利');
@@ -234,9 +306,9 @@ export function showTransactionModal(message) {
         modal.find('.transfer-modal-amount').text(`￥${content.amount}`);
         modal.find('.transfer-modal-note').text(content.note || '转账');
     }
-    
+
     modal.show();
-    
+
     const close = () => {
         modal.hide();
         modal.find('.confirm-btn, .cancel-btn').off('.transaction');
@@ -286,7 +358,7 @@ export function showNotificationBanner(contact, message) {
     }
 
     const bannerContent = `<div class="notification-content"><img src="${avatar}" class="notification-avatar"/><div class="notification-text"><h4>${name}</h4><p>${jQuery_API('<div>').text(preview).html()}</p></div></div>`;
-    
+
     setTimeout(() => {
         banner.html(bannerContent).addClass('show');
         notificationTimeoutId = setTimeout(() => banner.removeClass('show'), 4000);
