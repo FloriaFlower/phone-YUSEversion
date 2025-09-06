@@ -11,6 +11,8 @@ export function init(deps, dataHandler, uiObject) {
     DataHandler = dataHandler;
 }
 
+// ---- 私有辅助函数 ----
+
 function _createToggleButton() {
     const buttonHtml = `
         <div id="${PhoneSim_Config.TOGGLE_BUTTON_ID}" title="手机模拟器">
@@ -46,9 +48,13 @@ function _createAuxiliaryElements() {
                 </div>
             </div>
         </div>`;
-    jQuery_API(parentWin.document.body).append(dialogHtml);
+    if (jQuery_API(parentWin.document.body).find('#phone-sim-dialog-overlay').length === 0) {
+        jQuery_API(parentWin.document.body).append(dialogHtml);
+    }
 }
 
+
+// ---- 导出的核心UI函数 ----
 
 export async function initializeUI() {
     try {
@@ -83,7 +89,7 @@ export async function initializeUI() {
         _createToggleButton();
         _createAuxiliaryElements();
 
-        UI.populateApps();
+        UI.populateApps(); // [关键] 这个函数会创建所有App的图标
         UI.renderStickerPicker();
         UI.applyCustomizations();
         UI.addEventListeners();
@@ -127,66 +133,56 @@ export function togglePanel(forceShow = null) {
     }
 }
 
+// [修改] 升级 rerenderCurrentView 函数
 export function rerenderCurrentView(updates = {}) {
     let activeId = null;
     const currentViewId = PhoneSim_State.currentView;
 
-    // Determine the correct context ID based on the currently active view
+    // 根据当前视图确定需要使用的上下文ID
     switch(currentViewId) {
-        case 'ChatConversation':
-        case 'GroupMembers':
-        case 'GroupInvite':
-            activeId = PhoneSim_State.activeContactId;
-            break;
+        case 'ChatConversation': case 'GroupMembers': case 'GroupInvite':
+            activeId = PhoneSim_State.activeContactId; break;
         case 'Homepage':
-            activeId = PhoneSim_State.activeProfileId;
-            break;
+            activeId = PhoneSim_State.activeProfileId; break;
         case 'EmailDetail':
-            activeId = PhoneSim_State.activeEmailId;
-            break;
+            activeId = PhoneSim_State.activeEmailId; break;
         case 'ForumPostList':
-            activeId = PhoneSim_State.activeForumBoardId;
-            break;
+            activeId = PhoneSim_State.activeForumBoardId; break;
         case 'ForumPostDetail':
-            activeId = PhoneSim_State.activeForumPostId;
-            break;
+            activeId = PhoneSim_State.activeForumPostId; break;
         case 'LiveStreamList':
-            activeId = PhoneSim_State.activeLiveBoardId;
-            break;
+            activeId = PhoneSim_State.activeLiveBoardId; break;
         case 'LiveStreamRoom':
-            activeId = PhoneSim_State.activeLiveStreamId;
-            break;
-        // Views without a specific ID context don't need to be listed
+            activeId = PhoneSim_State.activeLiveStreamId; break;
+        // 欲色剧场App本身没有子页面ID，所以不需要在这里添加
     }
 
-    // Always re-render the main content of the current view
+    // 始终重新渲染当前视图的主内容
     UI.renderViewContent(currentViewId, activeId);
 
-    // Handle secondary UI updates that might be needed
+    // 根据更新标志，处理可能需要的额外UI刷新
     if (updates.chatUpdated) {
-        // If we are on the main ChatApp screen, we need to refresh the message list
         if(currentViewId === 'ChatApp') {
             UI.renderContactsList();
         }
     }
-    // [新增] 增加对欲色剧场更新的处理
+    // [新增] 当接收到剧场数据更新时，如果当前正在查看剧场App，就刷新它
     if (updates.theaterUpdated) {
         if(currentViewId === 'TheaterApp') {
-            UI.renderViewContent('TheaterApp');
+            // 直接调用渲染函数，它会使用最新的PhoneSim_State.theaterData
+            UI.renderTheaterApp();
         }
     }
 }
 
+// [修改] 升级 showView 函数
 export function showView(viewId, ...args) {
-    if (PhoneSim_State.isNavigating) {
-        return; // Navigation lock is active, ignore request.
-    }
+    if (PhoneSim_State.isNavigating) return;
 
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let targetViewId = viewId;
     let isSubViewNavigation = false;
 
-    // Special handling for BrowserHistory, which is a subview treated like a main view target
     if (viewId === 'BrowserHistory') {
         targetViewId = 'BrowserApp';
         isSubViewNavigation = true;
@@ -196,15 +192,14 @@ export function showView(viewId, ...args) {
     const nextView = p.find(`#${targetViewId.toLowerCase()}-view`);
 
     if (!nextView.length || (currentView.attr('id') === nextView.attr('id') && !args[0]?.forceRerender && !args[0]?.isTabSwitch)) {
-        // If it's just a subview navigation within the same main view, handle it without animation.
         if (isSubViewNavigation && currentView.attr('id') === nextView.attr('id')) {
-             UI.renderViewContent(viewId, ...args); // This will handle the subview switch
+             UI.renderViewContent(viewId, ...args);
              return;
         }
         return;
     }
 
-    PhoneSim_State.isNavigating = true; // Engage navigation lock
+    PhoneSim_State.isNavigating = true;
 
     let options = {};
     let dataArgs = [...args];
@@ -212,11 +207,9 @@ export function showView(viewId, ...args) {
         options = dataArgs.shift();
     }
 
-    // Store the active context ID in the global state
     const activeId = dataArgs[0];
     switch(viewId) {
-        case 'ChatConversation': PhoneSim_State.activeContactId = activeId; break;
-        case 'GroupMembers': case 'GroupInvite': PhoneSim_State.activeContactId = activeId; break;
+        case 'ChatConversation': case 'GroupMembers': case 'GroupInvite': PhoneSim_State.activeContactId = activeId; break;
         case 'Homepage': PhoneSim_State.activeProfileId = activeId; break;
         case 'EmailDetail': PhoneSim_State.activeEmailId = activeId; break;
         case 'ForumPostList': PhoneSim_State.activeForumBoardId = activeId; break;
@@ -228,8 +221,11 @@ export function showView(viewId, ...args) {
             PhoneSim_State.creationBoardContext = options.boardId || null;
             PhoneSim_State.previousView = PhoneSim_State.currentView;
             break;
+        // [新增] 欲色剧场App的case，虽然它目前没有子ID，但保留结构完整性
+        case 'TheaterApp':
+            PhoneSim_State.activeTheaterPage = 'announcements'; // 默认打开通告页面
+            break;
     }
-
 
     UI.renderViewContent(viewId, ...dataArgs);
     PhoneSim_State.currentView = viewId;
@@ -248,7 +244,7 @@ export function showView(viewId, ...args) {
         const { x, y } = options.animationOrigin;
         nextView.css({ '--origin-x': `${x}px`, '--origin-y': `${y}px` });
     } else if (isReturningHome) {
-        const closingAppViewId = currentView.attr('id'); // e.g., 'chatapp-view'
+        const closingAppViewId = currentView.attr('id');
         const closingAppId = closingAppViewId.replace('-view', '').replace(/\b\w/g, l => l.toUpperCase());
         const appIcon = p.find(`.app-block[data-view="${closingAppId}"]`);
 
@@ -260,7 +256,7 @@ export function showView(viewId, ...args) {
             const originY = rect.top - panelRect.top + rect.height / 2;
             currentView.css({ '--origin-x': `${originX}px`, '--origin-y': `${originY}px` });
         } else {
-            animationOut = 'slide-out-to-bottom'; // Fallback
+            animationOut = 'slide-out-to-bottom';
         }
     } else if (options.isTabSwitch) {
         animationIn = 'fade-in';
@@ -285,25 +281,24 @@ export function showView(viewId, ...args) {
     setTimeout(() => {
         currentView.removeClass('active').removeClass(animationOut);
         nextView.removeClass(animationIn).css({ zIndex: 2, '--origin-x': '', '--origin-y': '' });
-        PhoneSim_State.isNavigating = false; // Release navigation lock
+        PhoneSim_State.isNavigating = false;
     }, transitionDuration);
 }
 
-
+// [修改] 升级 renderViewContent 函数
 export function renderViewContent(viewId, ...args) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
 
-    // Special case for BrowserHistory: it's a subview of BrowserApp
     if (viewId === 'BrowserHistory') {
         const browserView = p.find('#browserapp-view');
         browserView.find('.browser-subview').removeClass('active');
         browserView.find('#browserhistory-view').addClass('active');
         UI.renderHistoryAndBookmarks();
-        return; // Handled, so we exit early.
+        return;
     }
 
     switch(viewId) {
-        case 'HomeScreen': break;
+        case 'HomeScreen': break; // 主屏幕由 populateApps 单独处理
         case 'ChatApp':
             UI.renderContactsList(); UI.renderContactsView(); UI.renderDiscoverView(); UI.renderMeView();
             const activeTab = PhoneSim_State.activeSubviews.chatapp || 'messages';
@@ -317,8 +312,7 @@ export function renderViewContent(viewId, ...args) {
         case 'Moments': UI.renderMomentsView(); break;
         case 'Homepage': UI.renderHomepage(args[0]); break;
         case 'PhoneApp':
-            UI.renderPhoneContactList();
-            UI.renderCallLogView();
+            UI.renderPhoneContactList(); UI.renderCallLogView();
             const activePhoneTab = PhoneSim_State.activeSubviews.phoneapp || 'contacts';
             p.find('#phoneapp-view .subview').removeClass('active').filter(`.phone-${activePhoneTab}-subview`).addClass('active');
             p.find('.phoneapp-bottom-nav .nav-item').removeClass('active').filter(`[data-target="${activePhoneTab}"]`).addClass('active');
@@ -327,69 +321,50 @@ export function renderViewContent(viewId, ...args) {
         case 'EmailDetail': UI.renderEmailDetail(args[0]); break;
         case 'SettingsApp': UI.renderSettingsView(); break;
         case 'BrowserApp': UI.renderBrowserState(); break;
-        // BrowserHistory is handled above, so no case is needed here.
         case 'ForumApp': UI.renderForumBoardList(); break;
         case 'ForumPostList': UI.renderForumPostList(args[0]); break;
         case 'ForumPostDetail': UI.renderForumPostDetail(args[0]); break;
         case 'LiveCenterApp': UI.renderLiveBoardList(); break;
         case 'LiveStreamList': UI.renderLiveStreamList(args[0]); break;
         case 'LiveStreamRoom': UI.renderLiveStreamRoom(args[0]); break;
-        case 'TheaterApp': UI.renderTheaterView(); break; // [新增] 欲色剧场渲染入口
+        // [新增] 当需要显示剧场App时，调用我们新的渲染函数
+        case 'TheaterApp': UI.renderTheaterApp(); break;
         case 'Creation': UI.renderCreationView(); break;
     }
 }
 
-export function renderCreationView() {
+export function populateApps() {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    const form = p.find('#creation-form');
-    form[0].reset();
+    const appGrid = p.find('#homescreen-view .app-grid');
+    const dockBar = p.find('#homescreen-view .dock-bar');
+    appGrid.empty();
+    dockBar.empty();
 
-    const context = PhoneSim_State.creationContext;
-    const boardContextId = PhoneSim_State.creationBoardContext;
+    const apps = [
+        { id: 'ChatApp', name: '微信', icon: 'fa-comment', color: '#7ED321' },
+        { id: 'EmailApp', name: '邮箱', icon: 'fa-envelope', color: '#50E3C2' },
+        { id: 'Moments', name: '朋友圈', icon: 'fa-images', color: '#4A90E2', isAliasFor: 'ChatApp' },
+        { id: 'BrowserApp', name: '浏览器', icon: 'fa-compass', color: '#F5A623' },
+        { id: 'ForumApp', name: '论坛', icon: 'fa-comments', color: '#BD10E0' },
+        { id: 'LiveCenterApp', name: '直播中心', icon: 'fa-stream', color: '#9013FE' },
+        { id: 'TheaterApp', name: '欲色剧场', icon: 'fa-film', color: '#ffc0cb' }, // [新增] 欲色剧场App注册信息
+        { id: 'SettingsApp', name: '设置', icon: 'fa-cog', color: '#B8E986' }
+    ];
+    const dockApps = ['PhoneApp', 'ChatApp'];
 
-    const title = context === 'forum' ? '创建新帖子' : '创建新直播';
-    p.find('#creation-view-title').text(title);
+    const createIconHtml = (app) => `
+        <div class="app-block" data-view="${app.isAliasFor || app.id}">
+            <div class="app-icon" style="background-color: ${app.color};"><i class="fas ${app.icon}"></i></div>
+            <span class="app-name">${app.name}</span>
+            <div class="app-badge" style="display:none;"></div>
+        </div>
+    `;
 
-    const boardInput = form.find('#creation-board-input');
-
-    if (boardContextId) {
-        const boardName = DataHandler.getBoardNameById(boardContextId, context);
-        boardInput.val(boardName).prop('readonly', true).css('background-color', '#e9ecef');
-    } else {
-        boardInput.val('').prop('readonly', false).css('background-color', '');
-    }
-}
-
-export async function showAddFriendDialog() {
-    return new Promise(resolve => {
-        const dialog = jQuery_API(parentWin.document.body).find('#phone-sim-add-friend-dialog');
-        const idInput = dialog.find('#add-friend-id-input');
-        const nicknameInput = dialog.find('#add-friend-nickname-input');
-        idInput.val('');
-        nicknameInput.val('');
-
-        dialog.show();
-        idInput.focus();
-
-        const confirmBtn = dialog.find('#phone-sim-add-friend-confirm');
-        const cancelBtn = dialog.find('#phone-sim-add-friend-cancel');
-
-        const close = (value) => {
-            dialog.hide();
-            confirmBtn.off();
-            cancelBtn.off();
-            resolve(value);
-        };
-
-        confirmBtn.one('click', () => {
-            const id = idInput.val().trim();
-            const nickname = nicknameInput.val().trim();
-            if (id && nickname) {
-                close({ id, nickname });
-            } else {
-                SillyTavern_Context_API.callGenericPopup('ID和昵称不能为空。', 'text');
-            }
-        });
-        cancelBtn.one('click', () => close(null));
+    apps.forEach(app => {
+        appGrid.append(createIconHtml(app));
     });
+
+    const phoneApp = { id: 'PhoneApp', name: '电话', icon: 'fa-phone', color: '#4CAF50' };
+    dockBar.append(createIconHtml(phoneApp));
+    dockBar.append(createIconHtml(apps.find(a => a.id === 'ChatApp')));
 }
