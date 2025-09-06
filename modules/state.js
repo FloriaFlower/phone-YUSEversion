@@ -3,10 +3,6 @@ import { PhoneSim_Config } from '../config.js';
 let parentWindow;
 
 export const PhoneSim_State = {
-    // 【新增】我们的黄金坐标宝箱，用来存放插件的基准路径
-    basePath: '',
-
-    // --- 以下是你提供的、完整的、现有的状态数据 ---
     isNavigating: false, // Prevents concurrent navigation actions
     isPanelVisible: false,
     panelPos: null,
@@ -16,7 +12,7 @@ export const PhoneSim_State = {
     callLogs: [],
     forumData: {},
     liveCenterData: {},
-    yuseTheaterData: {},
+    yuseTheaterData: {}, // [新增] 为欲色剧场App提供数据存储
     activeContactId: null,
     activeEmailId: null,
     activeProfileId: null,
