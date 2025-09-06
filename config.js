@@ -1,8 +1,4 @@
 export const PhoneSim_Config = {
-    EXTENSION_FOLDER_NAME: 'phone-YUSEversion',
-
-    PANEL_ID: 'phone-sim-panel-v10-0',
-    COMMIT_BUTTON_ID: 'phone-sim-commit-btn-v10-0',
     LOREBOOK_PREFIX: 'PhoneSim_Data_',
     WORLD_DB_NAME: '手机模拟器_聊天记录',
     WORLD_DIR_NAME: '手机模拟器_联系人目录',
@@ -31,12 +27,4 @@ export const PhoneSim_Config = {
         { name: '手机模拟器_直播数据', content: '{}', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' },
         { name: '手机模拟器_欲色剧场数据', content: '{}', enabled: false, comment: 'Managed by Phone Simulator Plugin. Do not edit manually.' }, // [新增] 初始化时创建欲色剧场的数据条目
     ]
-
-    STORAGE_KEY_CUSTOMIZATION: 'phone_sim_customization_v10',
-    STORAGE_KEY_UI: 'phone_sim_ui_state_v10',
-
-    PLAYER_ID: 'player',
-};
-
-
 };
