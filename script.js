@@ -2,16 +2,19 @@ import { PhoneSim_UI } from './modules/ui.js';
 import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
 import { PhoneSim_Sounds } from './modules/sounds.js';
+import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v18.0-GPS]';
+const loggingPrefix = '[手机模拟器 v16.12]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
 let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
+// Regex for Yuse Theater App
 const yuseTheaterRegex = /<yuse_data>[\s\S]*?<announcements>([\s\S]*?)<\/announcements>[\s\S]*?<customizations>([\s\S]*?)<\/customizations>[\s\S]*?<theater>([\s\S]*?)<\/theater>[\s\S]*?<theater_hot>([\s\S]*?)<\/theater_hot>[\s\S]*?<theater_new>([\s\S]*?)<\/theater_new>[\s\S]*?<theater_recommended>([\s\S]*?)<\/theater_recommended>[\s\S]*?<theater_paid>([\s\S]*?)<\/theater_paid>[\s\S]*?<shop>([\s\S]*?)<\/shop>[\s\S]*?<\/yuse_data>/s;
+
 
 function onSettingChanged() {
     PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
@@ -53,9 +56,10 @@ const debouncedMainProcessor = (msgId) => {
 };
 
 async function mainInitialize() {
-    console.log(`%c${loggingPrefix} Core APIs ready. Initializing...`, 'color: #4CAF50; font-weight: bold;');
+    console.log(`%c${loggingPrefix} Core APIs ready. Initializing UI and modules...`, 'color: #4CAF50; font-weight: bold;');
 
     const dependencies = {
+        st: parentWin.SillyTavern,
         st_context: SillyTavern_Context,
         th: TavernHelper_API,
         jq: jQuery_API,
@@ -64,15 +68,17 @@ async function mainInitialize() {
 
     PhoneSim_State.loadUiState();
     PhoneSim_Sounds.init(PhoneSim_State);
+
     PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
     PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
 
     const uiInitialized = await PhoneSim_UI.initializeUI();
     if (!uiInitialized) {
-        console.error(`${loggingPrefix} UI initialization failed. Aborting.`);
+        console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
         return;
     }
 
+    // [修改] fetchAllData会触发所有数据的加载，包括欲色剧场
     await PhoneSim_DataHandler.fetchAllData();
 
     const e = SillyTavern_Context.eventTypes;
@@ -88,7 +94,7 @@ async function mainInitialize() {
         PhoneSim_UI.togglePanel(true);
     }
 
-    console.log(`%c${loggingPrefix} GPS Navigation System Online.`, 'color: #ff9800; font-weight: bold;');
+    console.log(`%c${loggingPrefix} Initialization complete.`, 'color: #4CAF50; font-weight: bold;');
 }
 
 function areCoreApisReady() {
@@ -99,8 +105,9 @@ function areCoreApisReady() {
     return !!(SillyTavern_Context && TavernHelper_API && jQuery_API &&
         SillyTavern_Context.eventSource && typeof SillyTavern_Context.eventSource.on === 'function' &&
         SillyTavern_Context.eventTypes &&
-        jQuery_API("#extensions_settings2").length > 0 &&
-        typeof TavernHelper_API.getWorldbook === 'function');
+        typeof TavernHelper_API.getWorldbook === 'function' &&
+        typeof jQuery_API.fn.append === 'function' &&
+        typeof SillyTavern_Context.generate === 'function');
 }
 
 let apiReadyInterval = setInterval(() => {
@@ -108,27 +115,13 @@ let apiReadyInterval = setInterval(() => {
         clearInterval(apiReadyInterval);
 
         PhoneSim_State.init(parentWin);
-
-        // 【GPS接收器】
-        // 在一切开始之前，我们首先定位自己
-        if (document.currentScript && document.currentScript.src) {
-            const scriptUrl = new URL(document.currentScript.src);
-            const path = scriptUrl.pathname;
-            PhoneSim_State.basePath = path.substring(0, path.lastIndexOf('/'));
-            console.log(`${loggingPrefix} GPS lock acquired. Base path set to: ${PhoneSim_State.basePath}`);
-        } else {
-             console.error(`${loggingPrefix} CRITICAL: Could not determine base path via document.currentScript.src.`);
-             parentWin.toastr.error('无法定位插件资源路径。', '手机模拟器致命错误');
-             return;
-        }
-
         PhoneSim_State.loadCustomization();
         addSettingsHtml();
 
         if (PhoneSim_State.customization.enabled) {
             mainInitialize();
         } else {
-            console.log(`%c${loggingPrefix} Extension is disabled.`, 'color: #9E9E9E;');
+            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800 ;');
         }
     }
-}, 200);
+}, 100);
