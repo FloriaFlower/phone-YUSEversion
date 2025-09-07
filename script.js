@@ -25,7 +25,7 @@ import { PhoneSim_Sounds } from './modules/sounds.js';
         PhoneSim_State.init(dependencies);
         PhoneSim_Sounds.init(dependencies);
 
-        // 2. 交叉初始化UI和数据处理器，解决循环依赖
+        // 2. 交叉初始化UI和数据处理器
         PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
         PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
 
@@ -35,20 +35,14 @@ import { PhoneSim_Sounds } from './modules/sounds.js';
         // 4. 确认UI成功加载后再进行后续操作
         if (uiReady) {
             console.log("[Phone Sim] UI Initialized Successfully.");
-
-            // 绑定SillyTavern的核心事件监听器
             SillyTavern.getContext().eventSource.on('message_received', (data) => PhoneSim_DataHandler.mainProcessor(data.id));
-
-            // 如果插件初始状态是可见的，则打开它
             if (PhoneSim_State.isPanelVisible) {
                 PhoneSim_UI.togglePanel(true);
             }
-
             isInitialized = true;
             console.log("[Phone Sim] Fully initialized and running.");
         } else {
             console.error("[Phone Sim] UI initialization failed. Aborting further setup.");
-            // 如果UI加载失败，这里可以添加额外的错误处理逻辑
         }
     }
 
@@ -58,9 +52,13 @@ import { PhoneSim_Sounds } from './modules/sounds.js';
             jQuery = window.jQuery;
             SillyTavern = window.SillyTavern;
             TavernHelper = window.TavernHelper;
-
             clearInterval(mainInterval);
-            mainInitialize();
+            // 确保在DOM完全加载后再执行初始化
+            if(document.readyState === 'complete'){
+                mainInitialize();
+            } else {
+                window.addEventListener('load', mainInitialize);
+            }
         }
-    }, 500);
+    }, 200);
 })();
