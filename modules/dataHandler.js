@@ -1,30 +1,21 @@
-/* [关键修复] 修正了所有数据模块的导入路径 */
-import * as Processor from './data_modules/processor.js';
-import * as Actions from './data_modules/actions.js';
-import * as Fetch from './data_modules/fetch.js';
-import * as BrowserData from './data_modules/browserData.js';
-import * as ForumData from './data_modules/forumData.js';
-import * as LiveCenterData from './data_modules/liveCenterData.js';
-import * as TheaterData from './data_modules/theaterData.js'; // 确认路径正确
+/**
+ * 欲色剧场 (Theater App) 专属数据模块
+ * 负责提供默认的数据结构。
+ */
 
-const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterData, TheaterData];
-
-export const PhoneSim_DataHandler = {};
-
-export { getOrCreatePhoneLorebook, clearLorebookCache } from './data_modules/actions.js';
-
-modules.forEach(module => {
-    Object.keys(module).forEach(key => {
-        if (typeof module[key] === 'function' && key !== 'init') {
-            PhoneSim_DataHandler[key] = module[key];
-        }
-    });
-});
-
-PhoneSim_DataHandler.init = (dependencies, uiHandler) => {
-    modules.forEach(module => {
-        if (typeof module.init === 'function') {
-            module.init(dependencies, uiHandler, PhoneSim_DataHandler);
-        }
-    });
-};
+// 当世界书中的数据为空或损坏时，我们将使用这个函数来提供一个安全的默认结构
+// 这可以防止App因缺少数据而崩溃。
+export function getEmptyTheaterData() {
+    return {
+        announcements: [],
+        customizations: [],
+        theater_list: {
+            all_films: [],
+            hot: [],
+            new: [],
+            recommended: [],
+            paid: []
+        },
+        shop: []
+    };
+}
