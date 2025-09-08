@@ -17,7 +17,7 @@ const PRESET_FORUM_BOARDS = {
 
 const PRESET_LIVE_BOARDS = {
     "hot_games": { name: "热门游戏" },
-    "music_station": { name: "欲色专区" },
+    "music_station": { name: "音乐台" },
     "life_chat": { name: "生活闲聊" }
 };
 
