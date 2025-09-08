@@ -1,64 +1,126 @@
+
 import { PhoneSim_UI } from './modules/ui.js';
 import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
 import { PhoneSim_Sounds } from './modules/sounds.js';
+import { PhoneSim_Config } from './config.js';
 
-(function () {
-    let jQuery, SillyTavern, TavernHelper;
-    let mainInterval;
-    let isInitialized = false;
+'use strict';
 
-    // 核心初始化函数
-    async function mainInitialize() {
-        if (isInitialized) return;
-        console.log("[Phone Sim] Initializing...");
+const loggingPrefix = '[手机模拟器 v16.12]';
+const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
-        const dependencies = {
-            jq: jQuery,
-            st: SillyTavern,
-            st_context: SillyTavern.getContext(),
-            th: TavernHelper,
-            win: window
-        };
+let mainProcessorTimeout;
+let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
-        // 1. 初始化无依赖的模块
-        PhoneSim_State.init(dependencies);
-        PhoneSim_Sounds.init(dependencies);
+function onSettingChanged() {
+    PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
+    PhoneSim_State.saveCustomization(); // Use the new centralized save function
+    if (parentWin.toastr) {
+        parentWin.toastr.info('设置已保存。刷新页面以应用更改。', '手机模拟器');
+    }
+}
 
-        // 2. 交叉初始化UI和数据处理器
-        PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
-        PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
+function addSettingsHtml() {
+    const settingsHtml = `
+    <div class="phone-simulator-settings">
+        <div class="inline-drawer">
+            <div class="inline-drawer-toggle inline-drawer-header">
+                <b>手机模拟器 📱</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+            </div>
+            <div class="inline-drawer-content">
+                <div class="block">
+                    <label class="flex-container">
+                        <input id="phone_simulator_enabled" type="checkbox" />
+                        <span>启用手机模拟器</span>
+                    </label>
+                </div>
+                <small>禁用后，手机模拟器将不会加载悬浮窗或处理任何指令。更改后需要刷新页面才能完全生效。</small>
+            </div>
+        </div>
+    </div>`;
+    jQuery_API("#extensions_settings2").append(settingsHtml);
+    jQuery_API("#phone_simulator_enabled").prop("checked", PhoneSim_State.customization.enabled);
+    jQuery_API("#phone_simulator_enabled").on("change", onSettingChanged);
+}
 
-        // 3. 异步创建并注入UI到页面
-        const uiReady = await PhoneSim_UI.initializeUI();
+const debouncedMainProcessor = (msgId) => {
+    clearTimeout(mainProcessorTimeout);
+    mainProcessorTimeout = setTimeout(() => {
+        PhoneSim_DataHandler.mainProcessor(msgId);
+    }, 250);
+};
 
-        // 4. 确认UI成功加载后再进行后续操作
-        if (uiReady) {
-            console.log("[Phone Sim] UI Initialized Successfully.");
-            SillyTavern.getContext().eventSource.on('message_received', (data) => PhoneSim_DataHandler.mainProcessor(data.id));
-            if (PhoneSim_State.isPanelVisible) {
-                PhoneSim_UI.togglePanel(true);
-            }
-            isInitialized = true;
-            console.log("[Phone Sim] Fully initialized and running.");
-        } else {
-            console.error("[Phone Sim] UI initialization failed. Aborting further setup.");
-        }
+async function mainInitialize() {
+    console.log(`%c${loggingPrefix} Core APIs ready. Initializing UI and modules...`, 'color: #4CAF50; font-weight: bold;');
+
+    const dependencies = {
+        st: parentWin.SillyTavern,
+        st_context: SillyTavern_Context,
+        th: TavernHelper_API,
+        jq: jQuery_API,
+        win: parentWin
+    };
+    
+    // State is already initialized and customization loaded in the interval
+    // Load the rest of the UI state now that we know the extension is enabled.
+    PhoneSim_State.loadUiState();
+    
+    PhoneSim_Sounds.init(PhoneSim_State);
+
+    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI);
+    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler);
+    
+    const uiInitialized = await PhoneSim_UI.initializeUI();
+    if (!uiInitialized) {
+        console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
+        return;
     }
 
-    // 轮询检测SillyTavern核心API是否加载完成
-    mainInterval = setInterval(() => {
-        if (window.jQuery && window.SillyTavern && window.TavernHelper) {
-            jQuery = window.jQuery;
-            SillyTavern = window.SillyTavern;
-            TavernHelper = window.TavernHelper;
-            clearInterval(mainInterval);
-            // 确保在DOM完全加载后再执行初始化
-            if(document.readyState === 'complete'){
-                mainInitialize();
-            } else {
-                window.addEventListener('load', mainInitialize);
-            }
+    const e = SillyTavern_Context.eventTypes;
+    SillyTavern_Context.eventSource.on(e.MESSAGE_EDITED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_RECEIVED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_DELETED, (id) => PhoneSim_DataHandler.deleteMessagesBySourceId(id));
+    SillyTavern_Context.eventSource.on(e.CHAT_CHANGED, ()=> {
+         PhoneSim_DataHandler.clearLorebookCache();
+         if(PhoneSim_State.isPanelVisible) PhoneSim_DataHandler.fetchAllData();
+    });
+    
+    if (PhoneSim_State.isPanelVisible) {
+        PhoneSim_UI.togglePanel(true);
+    }
+
+    console.log(`%c${loggingPrefix} Initialization complete.`, 'color: #4CAF50; font-weight: bold;');
+}
+
+function areCoreApisReady() {
+    SillyTavern_Context = (parentWin.SillyTavern && parentWin.SillyTavern.getContext) ? parentWin.SillyTavern.getContext() : null;
+    TavernHelper_API = parentWin.TavernHelper;
+    jQuery_API = parentWin.jQuery;
+
+    return !!(SillyTavern_Context && TavernHelper_API && jQuery_API &&
+        SillyTavern_Context.eventSource && typeof SillyTavern_Context.eventSource.on === 'function' &&
+        SillyTavern_Context.eventTypes &&
+        typeof TavernHelper_API.getWorldbook === 'function' &&
+        typeof jQuery_API.fn.append === 'function' &&
+        typeof SillyTavern_Context.generate === 'function');
+}
+
+let apiReadyInterval = setInterval(() => {
+    if (areCoreApisReady()) {
+        clearInterval(apiReadyInterval);
+        
+        // CRITICAL ORDER: Init state, load customization (which includes 'enabled'), THEN add HTML and check the flag.
+        PhoneSim_State.init(parentWin);
+        PhoneSim_State.loadCustomization();
+        
+        addSettingsHtml();
+
+        if (PhoneSim_State.customization.enabled) {
+            mainInitialize();
+        } else {
+            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800;');
         }
-    }, 200);
-})();
+    }
+}, 100);
