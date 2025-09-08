@@ -1,4 +1,4 @@
-import { PhoneSim_Config } from '../../config.js';
+import { PhoneSim_Config } from 'config.js';
 import { PhoneSim_State } from '../state.js';
 
 let TavernHelper_API, parentWin, UI, DataHandler;
@@ -17,7 +17,7 @@ const PRESET_FORUM_BOARDS = {
 
 const PRESET_LIVE_BOARDS = {
     "hot_games": { name: "热门游戏" },
-    "music_station": { name: "音乐台" },
+    "music_station": { name: "欲色专区" },
     "life_chat": { name: "生活闲聊" }
 };
 
@@ -116,6 +116,24 @@ export async function fetchAllLiveCenterData() {
     }
 }
 
+// [新增] 为欲色剧场App获取数据的专用函数
+export async function fetchAllTheaterData() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.theaterData = {};
+        return;
+    }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const theaterEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_THEATER_DATABASE);
+        PhoneSim_State.theaterData = theaterEntry ? JSON.parse(theaterEntry.content || '{}') : {};
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch theater data:', er);
+        PhoneSim_State.theaterData = {};
+    }
+}
+
+
 export async function fetchAllData() {
     await fetchAllContacts();
     await fetchAllEmails();
@@ -124,7 +142,7 @@ export async function fetchAllData() {
     await fetchAllBrowserData();
     await fetchAllForumData();
     await fetchAllLiveCenterData();
-    await DataHandler.fetchAllTheaterData(); // [修改] 新增对欲色剧场数据的获取
+    await fetchAllTheaterData(); // [修改] 调用新增的函数
     await fetchAllDirectoryAndRequests();
     UI.updateGlobalUnreadCounts();
 }
