@@ -10,49 +10,6 @@ export function init(deps, uiHandler, dataHandler) {
     DataHandler = dataHandler;
 }
 
-// ---- 数据获取核心函数 ----
-
-// [新增] 获取“欲色剧场”专属数据的函数
-export async function fetchAllTheaterData() {
-    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
-    // 如果无法获取世界书，则使用安全的空数据结构，防止程序崩溃
-    if (!lorebookName) {
-        PhoneSim_State.theaterData = DataHandler.getEmptyTheaterData();
-        return;
-    }
-    try {
-        const entries = await TavernHelper_API.getWorldbook(lorebookName);
-        const theaterEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_THEATER_DATABASE);
-
-        if (theaterEntry && theaterEntry.content) {
-            PhoneSim_State.theaterData = JSON.parse(theaterEntry.content);
-        } else {
-            // 如果条目不存在或内容为空，同样使用安全的空数据结构
-            PhoneSim_State.theaterData = DataHandler.getEmptyTheaterData();
-        }
-    } catch (er) {
-        console.error('[Phone Sim] Failed to fetch theater data, using default structure:', er);
-        PhoneSim_State.theaterData = DataHandler.getEmptyTheaterData();
-    }
-}
-
-
-export async function fetchAllData() {
-    // 这个总开关函数，会依次调用所有的数据获取模块，确保所有信息都是最新的
-    await fetchAllContacts();
-    await fetchAllEmails();
-    await fetchAllMoments();
-    await fetchAllCallLogs();
-    await fetchAllBrowserData();
-    await fetchAllForumData();
-    await fetchAllLiveCenterData();
-    await DataHandler.fetchAllTheaterData(); // [确认] 我们在此调用了上面新增的函数
-    await fetchAllDirectoryAndRequests();
-    UI.updateGlobalUnreadCounts();
-}
-
-// ... 以下所有其他函数都保持你提供的文件中的原始格式和功能，以确保稳定 ...
-
 const PRESET_FORUM_BOARDS = {
     "campus_life": "校园生活",
     "academic_exchange": "学术交流"
@@ -75,9 +32,10 @@ export function getBoardNameById(boardId, context) {
         if (PRESET_LIVE_BOARDS[boardId]) {
             return PRESET_LIVE_BOARDS[boardId].name;
         }
+        // Custom live boards are not a feature, but this is a safe fallback
         return PhoneSim_State.liveCenterData[boardId]?.boardName || boardId;
     }
-    return boardId;
+    return boardId; // Fallback
 }
 
 
@@ -118,7 +76,7 @@ export async function fetchAllBrowserData() {
 
         const browserDb = browserDbEntry ? JSON.parse(browserDbEntry.content || '{}') : {};
 
-        PhoneSim_State.persistentBrowserHistory = browserDb.history || [];
+        PhoneSim_State.persistentBrowserHistory = browserDb.history || []; // For the library view
         PhoneSim_State.browserData = browserDb.pages || {};
         PhoneSim_State.browserBookmarks = browserDb.bookmarks || [];
         PhoneSim_State.browserDirectory = browserDb.directory || {};
@@ -156,6 +114,19 @@ export async function fetchAllLiveCenterData() {
         console.error('[Phone Sim] Failed to fetch live center data:', er);
         PhoneSim_State.liveCenterData = {};
     }
+}
+
+export async function fetchAllData() {
+    await fetchAllContacts();
+    await fetchAllEmails();
+    await fetchAllMoments();
+    await fetchAllCallLogs();
+    await fetchAllBrowserData();
+    await fetchAllForumData();
+    await fetchAllLiveCenterData();
+    await DataHandler.fetchAllTheaterData(); // [修改] 新增对欲色剧场数据的获取
+    await fetchAllDirectoryAndRequests();
+    UI.updateGlobalUnreadCounts();
 }
 
 export async function fetchAllMoments() {
@@ -221,6 +192,7 @@ export async function fetchAllContacts() {
             const contact = dbData[contactId];
             if (!contact.profile) continue;
 
+            // This now works for both users and groups if they have the flag.
             if (contact.profile.has_custom_avatar && avatarData[contactId]) {
                 contact.profile.avatar = avatarData[contactId];
             }
