@@ -1,70 +1,95 @@
 import { PhoneSim_Config } from '../config.js';
 import { PhoneSim_State } from './state.js';
 
-// 初始化剧场数据结构（避免undefined报错）
-if (!PhoneSim_State.theaterData) {
-    PhoneSim_State.theaterData = {
-        announcements: [], // 通告拍摄
-        customizations: [], // 粉丝定制
-        theater: [], // 剧场列表
-        shop: [] // 欲色商城
-    };
+// 初始化剧场数据（确保即使失败也不崩溃）
+try {
+    if (!PhoneSim_State.theaterData) {
+        PhoneSim_State.theaterData = {
+            announcements: [],
+            customizations: [],
+            theater: [],
+            shop: []
+        };
+    }
+} catch (err) {
+    console.error('[Theater Data Init] Error:', err);
+    // 极端情况：全局状态初始化失败，仍手动创建
+    window.PhoneSim_State = window.PhoneSim_State || {};
+    window.PhoneSim_State.theaterData = { announcements: [], customizations: [], theater: [], shop: [] };
 }
 
 /**
- * 解析AI对话中的欲色剧场格式（根据你的样板示例设计，假设格式为<TheaterData>{...}</TheaterData>）
- * @param {string} text - AI返回的对话文本
+ * 安全解析剧场格式，不中断整体流程
  */
 export function parseTheaterFormat(text) {
+    // 若文本为空或无匹配，直接返回
+    if (!text || !text.includes('<TheaterData>')) return;
+    
     try {
-        // 1. 匹配对话中的剧场数据标签（可根据实际样板调整正则）
         const theaterRegex = /<TheaterData>([\s\S]*?)<\/TheaterData>/g;
         const matches = text.matchAll(theaterRegex);
-
-        // 2. 解析匹配到的数据并更新到全局状态
+        
         for (const match of matches) {
             const theaterJson = match[1].trim();
-            const theaterData = JSON.parse(theaterJson); // 假设数据为JSON格式
+            if (!theaterJson) continue; // 空内容跳过
             
-            // 3. 按页面分类更新数据（与renderTheater.js对应）
-            if (theaterData.announcements) PhoneSim_State.theaterData.announcements = theaterData.announcements;
-            if (theaterData.customizations) PhoneSim_State.theaterData.customizations = theaterData.customizations;
-            if (theaterData.theater) PhoneSim_State.theaterData.theater = theaterData.theater;
-            if (theaterData.shop) PhoneSim_State.theaterData.shop = theaterData.shop;
+            // 二次捕获JSON解析错误
+            let theaterData;
+            try {
+                theaterData = JSON.parse(theaterJson);
+            } catch (jsonErr) {
+                console.error('[Theater JSON Parse] Error:', jsonErr, 'Raw:', theaterJson);
+                continue; // 单个解析失败，跳过继续处理其他
+            }
             
-            console.log('[解析成功] 欲色剧场数据更新：', theaterData);
+            // 安全更新数据（避免undefined报错）
+            if (Array.isArray(theaterData.announcements)) {
+                PhoneSim_State.theaterData.announcements = theaterData.announcements;
+            }
+            if (Array.isArray(theaterData.customizations)) {
+                PhoneSim_State.theaterData.customizations = theaterData.customizations;
+            }
+            if (Array.isArray(theaterData.theater)) {
+                PhoneSim_State.theaterData.theater = theaterData.theater;
+            }
+            if (Array.isArray(theaterData.shop)) {
+                PhoneSim_State.theaterData.shop = theaterData.shop;
+            }
         }
     } catch (err) {
-        console.error('[解析失败] 欲色剧场格式错误：', err);
+        console.error('[Theater Parse] Fatal Error:', err);
+        // 解析失败不抛出，确保后续代码执行
     }
 }
 
-/**
- * 获取下一个玩家操作的时间戳（原有功能保留）
- */
+// 原有函数保持不变，但增加错误捕获
 export function getNextPlayerTimestamp() {
-    const now = new Date();
-    return now.toISOString();
-}
-
-/**
- * 解析世界状态（原有功能保留，新增剧场解析调用）
- * @param {string} text - 包含世界状态的文本
- */
-export function parseWorldState(text) {
-    // 原有世界状态解析逻辑...
-    const worldStateMatch = text.match(PhoneSim_Config.WORLD_STATE_REGEX);
-    if (worldStateMatch) {
-        PhoneSim_State.worldTime = worldStateMatch[1];
+    try {
+        const now = new Date();
+        return now.toISOString();
+    } catch (err) {
+        console.error('[Get Timestamp] Error:', err);
+        return new Date().toISOString(); // 兜底
     }
-
-    // 新增：解析剧场格式
-    parseTheaterFormat(text);
 }
 
-// 暴露解析器
+export function parseWorldState(text) {
+    try {
+        // 原有世界状态解析
+        const worldStateMatch = text.match(PhoneSim_Config.WORLD_STATE_REGEX);
+        if (worldStateMatch) {
+            PhoneSim_State.worldTime = worldStateMatch[1];
+        }
+        // 安全解析剧场格式
+        parseTheaterFormat(text);
+    } catch (err) {
+        console.error('[Parse World State] Error:', err);
+        // 失败不中断
+    }
+}
+
 export const PhoneSim_Parser = {
     getNextPlayerTimestamp,
     parseWorldState,
-    parseTheaterFormat // 供外部调用（如commitStagedActions后重新解析）
+    parseTheaterFormat
 };
