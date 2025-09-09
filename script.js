@@ -3,36 +3,24 @@ import { PhoneSim_DataHandler } from './modules/dataHandler.js';
 import { PhoneSim_State } from './modules/state.js';
 import { PhoneSim_Sounds } from './modules/sounds.js';
 import { PhoneSim_Config } from './config.js';
-import { TheaterRenderer } from './modules/ui_modules/renderTheater.js'; // 关键依赖
+
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v17.1 终极修复]';
-const parentWin = window.parent || window;
-let mainProcessorTimeout, isInitialized = false;
+const loggingPrefix = '[手机模拟器 v17.0_FIXED]';
+const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
-// ------------------------
-// 【新增】移动端友好的日志输出（通过toast替代控制台）
-// ------------------------
-function showToast(msg, type = 'info') {
-    if (parentWin.toastr) {
-        parentWin.toastr[type](msg, '手机模拟器');
-    } else {
-        console.log(`[${type.toUpperCase()}] ${msg}`);
-    }
-}
+let mainProcessorTimeout;
+let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
 function onSettingChanged() {
-    const enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
-    PhoneSim_State.customization.enabled = enabled;
+    PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
     PhoneSim_State.saveCustomization();
-    showToast('设置已保存，刷新后生效', 'info');
+    if (parentWin.toastr) {
+        parentWin.toastr.info('设置已保存。刷新页面以应用更改。', '手机模拟器');
+    }
 }
 
 function addSettingsHtml() {
-    if (jQuery_API("#extensions_settings2").length === 0) {
-        showToast('未找到设置面板，跳过添加', 'warn');
-        return;
-    }
     const settingsHtml = `
     <div class="phone-simulator-settings">
         <div class="inline-drawer">
@@ -43,106 +31,94 @@ function addSettingsHtml() {
             <div class="inline-drawer-content">
                 <div class="block">
                     <label class="flex-container">
-                        <input id="phone_simulator_enabled" type="checkbox" ${PhoneSim_State.customization.enabled ? 'checked' : ''}>
+                        <input id="phone_simulator_enabled" type="checkbox" />
                         <span>启用手机模拟器</span>
                     </label>
                 </div>
-                <small>需刷新生效</small>
+                <small>禁用后，手机模拟器将不会加载悬浮窗或处理任何指令。更改后需要刷新页面才能完全生效。</small>
             </div>
         </div>
     </div>`;
     jQuery_API("#extensions_settings2").append(settingsHtml);
+    jQuery_API("#phone_simulator_enabled").prop("checked", PhoneSim_State.customization.enabled);
     jQuery_API("#phone_simulator_enabled").on("change", onSettingChanged);
 }
 
+const debouncedMainProcessor = (msgId) => {
+    clearTimeout(mainProcessorTimeout);
+    mainProcessorTimeout = setTimeout(() => {
+        PhoneSim_DataHandler.mainProcessor(msgId);
+    }, 250);
+};
+
 async function mainInitialize() {
-    if (isInitialized) return;
-    isInitialized = true;
+    console.log(`%c${loggingPrefix} Core APIs ready. Initializing UI and modules...`, 'color: #4CAF50; font-weight: bold;');
 
-    // ------------------------
-    // 【核心修复】分步初始化+容错
-    // ------------------------
-    try {
-        showToast('正在初始化...', 'info');
-        
-        // 1. 检查核心API（增加友好提示）
-        if (!parentWin.SillyTavern || !parentWin.TavernHelper || !parentWin.jQuery) {
-            showToast('依赖API未加载，请刷新页面', 'error');
-            return;
+    const dependencies = {
+        st: parentWin.SillyTavern,
+        st_context: SillyTavern_Context,
+        th: TavernHelper_API,
+        jq: jQuery_API,
+        win: parentWin
+    };
+
+    PhoneSim_State.loadUiState();
+    PhoneSim_Sounds.init(PhoneSim_State);
+
+    // [妈妈的修复] 保证两个聚合器都完全初始化，并将完整的自身作为依赖传递进去
+    PhoneSim_DataHandler.init(dependencies, PhoneSim_UI, PhoneSim_DataHandler);
+    PhoneSim_UI.init(dependencies, PhoneSim_DataHandler, PhoneSim_UI);
+
+    const uiInitialized = await PhoneSim_UI.initializeUI();
+    if (!uiInitialized) {
+        console.error(`${loggingPrefix} UI initialization failed. Aborting further setup.`);
+        return;
+    }
+
+    await PhoneSim_DataHandler.fetchAllData();
+
+    const e = SillyTavern_Context.eventTypes;
+    SillyTavern_Context.eventSource.on(e.MESSAGE_EDITED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_RECEIVED, (id) => debouncedMainProcessor(id));
+    SillyTavern_Context.eventSource.on(e.MESSAGE_DELETED, (id) => PhoneSim_DataHandler.deleteMessagesBySourceId(id));
+    SillyTavern_Context.eventSource.on(e.CHAT_CHANGED, ()=> {
+         PhoneSim_DataHandler.clearLorebookCache();
+         if(PhoneSim_State.isPanelVisible) PhoneSim_DataHandler.fetchAllData();
+    });
+
+    if (PhoneSim_State.isPanelVisible) {
+        PhoneSim_UI.togglePanel(true);
+    }
+
+    console.log(`%c${loggingPrefix} Initialization complete.`, 'color: #4CAF50; font-weight: bold;');
+}
+
+function areCoreApisReady() {
+    SillyTavern_Context = (parentWin.SillyTavern && parentWin.SillyTavern.getContext) ? parentWin.SillyTavern.getContext() : null;
+    TavernHelper_API = parentWin.TavernHelper;
+    jQuery_API = parentWin.jQuery;
+
+    return !!(SillyTavern_Context && TavernHelper_API && jQuery_API &&
+        SillyTavern_Context.eventSource && typeof SillyTavern_Context.eventSource.on === 'function' &&
+        SillyTavern_Context.eventTypes &&
+        typeof TavernHelper_API.getWorldbook === 'function' &&
+        typeof jQuery_API.fn.append === 'function' &&
+        typeof SillyTavern_Context.generate === 'function');
+}
+
+let apiReadyInterval = setInterval(() => {
+    if (areCoreApisReady()) {
+        clearInterval(apiReadyInterval);
+
+        PhoneSim_State.init(parentWin);
+        PhoneSim_State.loadCustomization();
+
+        addSettingsHtml();
+
+        if (PhoneSim_State.customization.enabled) {
+            mainInitialize();
+        } else {
+            console.log(`%c${loggingPrefix} Extension is disabled via settings.`, 'color: #ff9800 ;');
         }
-
-        const dependencies = {
-            st: parentWin.SillyTavern,
-            st_context: parentWin.SillyTavern.getContext(),
-            th: parentWin.TavernHelper,
-            jq: parentWin.jQuery,
-            win: parentWin
-        };
-
-        // 2. 初始化剧场模块（增加容错）
-        try {
-            TheaterRenderer.init(dependencies, PhoneSim_UI);
-            PhoneSim_UI.TheaterRenderer = TheaterRenderer;
-        } catch (e) {
-            showToast('剧场模块初始化失败：' + e.message, 'error');
-        }
-
-        // 3. 初始化UI（关键：延迟200ms等待DOM加载）
-        setTimeout(async () => {
-            try {
-                const uiReady = await PhoneSim_UI.initializeUI();
-                if (!uiReady) {
-                    showToast('UI初始化失败，请检查悬浮窗权限', 'error');
-                    return;
-                }
-                showToast('UI加载成功！', 'success');
-                await PhoneSim_DataHandler.fetchAllData();
-                
-                // 4. 强制显示悬浮按钮（新增）
-                PhoneSim_UI.togglePanel(PhoneSim_State.isPanelVisible);
-                
-            } catch (e) {
-                showToast('初始化出错：' + e.message, 'error');
-            }
-        }, 200); // 延迟避免DOM未就绪
-
-    } catch (e) {
-        showToast('初始化失败：' + e.message, 'error');
     }
-}
-
-// ------------------------
-// 【新增】移动端适配：监听页面加载完成
-// ------------------------
-parentWin.addEventListener('DOMContentLoaded', () => {
-    if (PhoneSim_State.customization.enabled) {
-        mainInitialize();
-    } else {
-        showToast('插件已禁用，请到设置开启', 'info');
-    }
-});
-
-// ------------------------
-// 【新增】权限检测（替代控制台）
-// ------------------------
-function checkOverlayPermission() {
-    if (parentWin.android) { // 模拟器环境
-        parentWin.android.requestOverlayPermission((granted) => {
-            if (!granted) {
-                showToast('请手动开启悬浮窗权限', 'error');
-            } else {
-                mainInitialize();
-            }
-        });
-    } else {
-        mainInitialize(); // 浏览器环境默认有权限
-    }
-}
-
-// 入口（兼容移动端模拟器）
-if (parentWin.android) { // 检测是否为安卓模拟器
-    parentWin.android.on('permissionGranted', checkOverlayPermission);
-    parentWin.android.requestOverlayPermission();
-} else {
-    mainInitialize();
-}
+}, 100);
