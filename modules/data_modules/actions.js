@@ -204,13 +204,13 @@ export async function addWeChatCallEndMessage(contactId, duration) {
 
 export async function initiateVoiceCall(contactId) {
     const contactName = UI._getContactName(contactId);
-    const prompt = `(系统提示：洛洛向${contactName}发起了微信语音通话...)`;
+    const prompt = `(系统提示：{{user}}向${contactName}发起了微信语音通话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
 }
 
 export async function initiatePhoneCall(callTarget) {
-    const prompt = `(系统提示：洛洛正在呼叫${callTarget.name}的电话...)`;
+    const prompt = `(系统提示：{{user}}正在呼叫${callTarget.name}的电话...)`;
     await TavernHelper_API.triggerSlash(`/setinput ${JSON.stringify(prompt)}`);
     SillyTavern_Context_API.generate();
     UI.closeCallUI();
@@ -293,7 +293,7 @@ export async function commitStagedActions() {
     PhoneSim_State.stagedPlayerActions = [];
     UI.updateCommitButton();
 
-    let textPrompt = `(系统提示：洛洛刚刚在手机上进行了如下操作：\\n`;
+    let textPrompt = `(系统提示：{{user}}刚刚在手机上进行了如下操作：\\n`;
     let hasActionsForAI = false;
 
     const finalMessagesToPersist = [];
@@ -475,6 +475,19 @@ export async function commitStagedActions() {
                 }
                 break;
             }
+            // [新增] 欲色剧场App的动作提示
+            case 'theater_accept_customization': {
+                textPrompt += `- 在欲色剧场中，接取了粉丝“${action.fanId}”的“${action.title}”定制任务，报酬为${action.reward}。\\n`;
+                break;
+            }
+            case 'theater_ignore_customization': {
+                textPrompt += `- 在欲色剧场中，忽略了粉丝“${action.fanId}”的“${action.title}”定制任务。\\n`;
+                break;
+            }
+            case 'theater_start_shooting': {
+                textPrompt += `- 在欲色剧场中，{{user}}决定开始拍摄通告中的影片《${action.title}》，合作演员是${action.actor}。\\n`;
+                break;
+            }
         }
     });
 
@@ -595,6 +608,25 @@ export async function commitStagedActions() {
                 }
             });
             return forumDb;
+        });
+    }
+
+    // [新增] 处理剧场App的数据持久化
+    const theaterActions = playerActionsToCommit.filter(a => a.type.includes('theater_'));
+    if (theaterActions.length > 0) {
+        await _updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, theaterDb => {
+            theaterActions.forEach(action => {
+                if (action.type === 'theater_accept_customization' || action.type === 'theater_ignore_customization') {
+                    // 从定制列表中移除已处理的项
+                    if (theaterDb.customizations && Array.isArray(theaterDb.customizations)) {
+                        theaterDb.customizations = theaterDb.customizations.filter(
+                            cust => !(cust.fanId === action.fanId && cust.typeName === action.title)
+                        );
+                    }
+                }
+                // 其他剧场动作可以在此添加数据处理逻辑, 如拍摄完成后增加作品等
+            });
+            return theaterDb;
         });
     }
 
@@ -875,3 +907,4 @@ export async function clearChatHistoryForContact(contactId) {
         return dbData;
     });
 }
+
