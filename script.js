@@ -6,19 +6,15 @@ import { PhoneSim_Config } from './config.js';
 
 'use strict';
 
-const loggingPrefix = '[手机模拟器 v16.12]';
+const loggingPrefix = '[手机模拟器 v17.0_FIXED]';
 const parentWin = typeof window.parent !== 'undefined' ? window.parent : window;
 
 let mainProcessorTimeout;
 let SillyTavern_Context, TavernHelper_API, jQuery_API;
 
-// Regex for Yuse Theater App
-const yuseTheaterRegex = /<yuse_data>[\s\S]*?<announcements>([\s\S]*?)<\/announcements>[\s\S]*?<customizations>([\s\S]*?)<\/customizations>[\s\S]*?<theater>([\s\S]*?)<\/theater>[\s\S]*?<theater_hot>([\s\S]*?)<\/theater_hot>[\s\S]*?<theater_new>([\s\S]*?)<\/theater_new>[\s\S]*?<theater_recommended>([\s\S]*?)<\/theater_recommended>[\s\S]*?<theater_paid>([\s\S]*?)<\/theater_paid>[\s\S]*?<shop>([\s\S]*?)<\/shop>[\s\S]*?<\/yuse_data>/s;
-
-
 function onSettingChanged() {
     PhoneSim_State.customization.enabled = jQuery_API("#phone_simulator_enabled").prop("checked");
-    PhoneSim_State.saveCustomization(); // Use the new centralized save function
+    PhoneSim_State.saveCustomization();
     if (parentWin.toastr) {
         parentWin.toastr.info('设置已保存。刷新页面以应用更改。', '手机模拟器');
     }
@@ -51,8 +47,7 @@ function addSettingsHtml() {
 const debouncedMainProcessor = (msgId) => {
     clearTimeout(mainProcessorTimeout);
     mainProcessorTimeout = setTimeout(() => {
-        // Pass the new regex to the main processor
-        PhoneSim_DataHandler.mainProcessor(msgId, { yuseTheater: yuseTheaterRegex });
+        PhoneSim_DataHandler.mainProcessor(msgId);
     }, 250);
 };
 
@@ -67,12 +62,10 @@ async function mainInitialize() {
         win: parentWin
     };
 
-    // State is already initialized and customization loaded in the interval
-    // Load the rest of the UI state now that we know the extension is enabled.
     PhoneSim_State.loadUiState();
-
     PhoneSim_Sounds.init(PhoneSim_State);
 
+    // [妈妈的修复] 保证两个聚合器都完全初始化，并将完整的自身作为依赖传递进去
     PhoneSim_DataHandler.init(dependencies, PhoneSim_UI, PhoneSim_DataHandler);
     PhoneSim_UI.init(dependencies, PhoneSim_DataHandler, PhoneSim_UI);
 
@@ -117,7 +110,6 @@ let apiReadyInterval = setInterval(() => {
     if (areCoreApisReady()) {
         clearInterval(apiReadyInterval);
 
-        // CRITICAL ORDER: Init state, load customization (which includes 'enabled'), THEN add HTML and check the flag.
         PhoneSim_State.init(parentWin);
         PhoneSim_State.loadCustomization();
 
