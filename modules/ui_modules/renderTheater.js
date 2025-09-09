@@ -100,3 +100,4 @@ export const TheaterRenderer = {
     switchPage,
     updateNav
 };
+
