@@ -5,7 +5,7 @@ import { PhoneSim_Sounds } from '../sounds.js';
 import { _updateWorldbook } from './actions.js';
 import { fetchAllData } from './fetch.js';
 import { saveSearchResults, savePageContent } from './browserData.js';
-import { saveTheaterData } from './theaterData.js'; // [新增] 导入欲色剧场数据保存函数
+// [删除] 不再需要单独的保存函数，统一由 _handleTheaterDataCommand 处理
 
 let TavernHelper_API, UI, DataHandler;
 
@@ -14,6 +14,17 @@ export function init(deps, uiHandler, dataHandler) {
     UI = uiHandler;
     DataHandler = dataHandler;
 }
+
+// [新增] 用于处理欲色剧场数据更新的专用函数
+async function _handleTheaterDataCommand(command, msgId) {
+    await _updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, oldData => {
+        // 创建一个新的数据副本，而不是直接修改旧数据
+        // 这样可以确保每次都是全新的数据覆盖，避免旧数据残留
+        const newData = { ...command.data, sourceMsgId: msgId };
+        return newData;
+    });
+}
+
 
 async function _handleProfileUpdateCommands(commands) {
     await _updateWorldbook(PhoneSim_Config.WORLD_DB_NAME, dbData => {
@@ -392,7 +403,7 @@ async function _handleFriendRequestCommands(commands) {
     });
 }
 
-export async function mainProcessor(msgId, extraRegexes = {}) { // [修改] 增加extraRegexes参数
+export async function mainProcessor(msgId) { // [修改] 移除了不再需要的 extraRegexes 参数
     UI.closeCallUI();
     const messages = TavernHelper_API.getChatMessages(msgId);
     if (!messages || !messages.length) return;
@@ -401,39 +412,21 @@ export async function mainProcessor(msgId, extraRegexes = {}) { // [修改] 增�
     PhoneSim_Parser.updateWorldDate(rawMessage);
     UI.updateTime();
 
-    // [新增] 处理欲色剧场数据
-    let theaterUpdated = false;
-    if (extraRegexes.yuseTheater) {
-        const theaterMatch = rawMessage.match(extraRegexes.yuseTheater);
-        if (theaterMatch) {
-            const theaterData = {
-                announcements: theaterMatch[1],
-                customizations: theaterMatch[2],
-                theater: theaterMatch[3],
-                theater_hot: theaterMatch[4],
-                theater_new: theaterMatch[5],
-                theater_recommended: theaterMatch[6],
-                theater_paid: theaterMatch[7],
-                shop: theaterMatch[8]
-            };
-            await saveTheaterData(theaterData, msgId);
-            theaterUpdated = true;
-        }
-    }
-
-
     const commands = [];
     const lines = rawMessage.split(/\r?\n/);
     lines.forEach(line => {
+        // [修改] 让 parseCommand 处理所有格式, 包括剧场
         const command = PhoneSim_Parser.parseCommand(line);
         if (command) commands.push(command);
     });
 
-    if (commands.length === 0 && !theaterUpdated) { // [修改] 增加!theaterUpdated判断
+    // 如果没有解析到任何指令，就提前退出
+    if (commands.length === 0) {
         if (msgId !== null) return;
     }
     PhoneSim_State.lastProcessedMsgId = msgId;
 
+    // [修改] 分类指令时新增对 TheaterUpdate 的处理
     const chatCommands = commands.filter(cmd => cmd.commandType === 'Chat' && cmd.interactiveType !== 'friend_request');
     const friendRequestCommands = commands.filter(cmd => cmd.interactiveType === 'friend_request');
     const momentCommands = commands.filter(cmd => cmd.commandType === 'Moment');
@@ -446,8 +439,15 @@ export async function mainProcessor(msgId, extraRegexes = {}) { // [修改] 增�
     const browserSearchResultCommands = commands.filter(cmd => cmd.app === '浏览器' && cmd.type === '搜索目录');
     const browserWebpageCommand = commands.find(cmd => cmd.app === '浏览器' && cmd.type === '网页');
     const liveCenterCommands = commands.filter(cmd => cmd.commandType === 'LiveCenter');
+    const theaterUpdateCommand = commands.find(cmd => cmd.commandType === 'TheaterUpdate'); // 新增
 
-    let chatUpdated = false, emailUpdated = false, momentsUpdated = false, profileUpdated = false, browserUpdated = false, forumUpdated = false, liveCenterUpdated = false;
+    let chatUpdated = false, emailUpdated = false, momentsUpdated = false, profileUpdated = false, browserUpdated = false, forumUpdated = false, liveCenterUpdated = false, theaterUpdated = false; // 新增 theaterUpdated
+
+    // [新增] 处理剧场数据更新的逻辑
+    if (theaterUpdateCommand) {
+        await _handleTheaterDataCommand(theaterUpdateCommand, msgId);
+        theaterUpdated = true;
+    }
 
     for (const cmd of appCommands) {
         if (cmd.app === 'Email' && cmd.type === 'New') {
