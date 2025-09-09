@@ -1,5 +1,3 @@
-
-
 import * as Processor from './data_modules/processor.js';
 import * as Actions from './data_modules/actions.js';
 import * as Fetch from './data_modules/fetch.js';
@@ -29,4 +27,4 @@ PhoneSim_DataHandler.init = (dependencies, uiHandler) => {
             module.init(dependencies, uiHandler, PhoneSim_DataHandler);
         }
     });
-}
+};
