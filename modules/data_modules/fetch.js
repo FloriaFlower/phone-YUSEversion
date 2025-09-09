@@ -1,4 +1,4 @@
-import { PhoneSim_Config } from 'config.js';
+import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
 let TavernHelper_API, parentWin, UI, DataHandler;
