@@ -1,63 +1,137 @@
-import { PhoneSim_Config } from '../config.js'; // [妈妈的修改] 导入Config和State
-import { PhoneSim_State } from './state.js';
+import { PhoneSim_Config } from '../../config.js';
+import { PhoneSim_State } from '../state.js';
 
-import * as Core from './ui_modules/core.js';
-import * as Events from './ui_modules/events.js';
-import * as RenderChat from './ui_modules/renderChat.js';
-import * as RenderMoments from './ui_modules/renderMoments.js';
-import * as RenderCall from './ui_modules/renderCall.js';
-import * as RenderPhoneEmail from './ui_modules/renderPhoneEmail.js';
-import * as RenderGroup from './ui_modules/renderGroup.js';
-import * as RenderBrowser from './ui_modules/renderBrowser.js';
-import * as RenderForum from './ui_modules/renderForum.js';
-import * as RenderLiveCenter from './ui_modules/renderLiveCenter.js';
-import * as RenderSettings from './ui_modules/renderSettings.js';
-import * as RenderTheater from './ui_modules/renderTheater.js';
-import * as Components from './ui_modules/components.js';
-import * as Utils from './ui_modules/utils.js';
+let jQuery_API, parentWin, SillyTavern_Context_API, UI, DataHandler;
 
-const modules = [Core, Events, RenderChat, RenderMoments, RenderCall, RenderPhoneEmail, RenderGroup, RenderBrowser, RenderForum, RenderLiveCenter, RenderSettings, RenderTheater, Components, Utils];
-
-export const PhoneSim_UI = {};
-
-// [妈妈的修改] 外部依赖将在init时注入
-let jQuery_API, parentWin, DataHandler;
-
-
-modules.forEach(module => {
-    Object.keys(module).forEach(key => {
-        if (typeof module[key] === 'function' && key !== 'init') {
-            PhoneSim_UI[key] = module[key];
-        } else if (typeof module[key] === 'object' && module[key] !== null) {
-            PhoneSim_UI[key] = { ...PhoneSim_UI[key], ...module[key] };
-        }
-    });
-});
-
-PhoneSim_UI.init = (dependencies, dataHandler) => {
-    // [妈妈的修改] 注入外部API
-    jQuery_API = dependencies.jq;
-    parentWin = dependencies.win;
+export function init(deps, dataHandler, uiObject) {
+    jQuery_API = deps.jq;
+    parentWin = deps.win;
+    SillyTavern_Context_API = deps.st_context;
+    UI = uiObject;
     DataHandler = dataHandler;
+}
 
-    modules.forEach(module => {
-        if (typeof module.init === 'function') {
-            module.init(dependencies, dataHandler, PhoneSim_UI);
+function _createToggleButton() {
+    const buttonHtml = `
+        <div id="${PhoneSim_Config.TOGGLE_BUTTON_ID}" title="手机模拟器">
+            <i class="fas fa-mobile-alt"></i>
+            <div class="unread-badge" style="display:none;"></div>
+        </div>`;
+    jQuery_API(parentWin.document.body).append(buttonHtml);
+}
+
+function _createAuxiliaryElements() {
+    if (jQuery_API(parentWin.document.body).find('#phone-sim-file-input').length === 0) {
+        jQuery_API(parentWin.document.body).append('<input type="file" id="phone-sim-file-input" accept="image/*" style="display:none;">');
+    }
+
+    const dialogHtml = `
+        <div class="phone-sim-dialog-overlay" id="phone-sim-dialog-overlay" style="display:none;">
+            <div class="phone-sim-dialog">
+                <h3 id="phone-sim-dialog-title"></h3>
+                <div class="dialog-content"><textarea id="phone-sim-dialog-textarea" class="dialog-input"></textarea></div>
+                <div class="dialog-buttons">
+                    <button id="phone-sim-dialog-cancel" class="dialog-btn cancel-btn">取消</button>
+                    <button id="phone-sim-dialog-confirm" class="dialog-btn confirm-btn">确定</button>
+                </div>
+            </div>
+        </div>
+        <div class="phone-sim-dialog-overlay" id="phone-sim-call-input-overlay" style="display:none;">
+             <div class="phone-sim-dialog">
+                <h3 id="phone-sim-call-input-title">在通话中发言</h3>
+                <div class="dialog-content"><textarea id="phone-sim-call-input-textarea" class="dialog-input" placeholder="输入你想说的话..."></textarea></div>
+                <div class="dialog-buttons">
+                    <button id="phone-sim-call-input-cancel" class="dialog-btn cancel-btn">取消</button>
+                    <button id="phone-sim-call-input-confirm" class="dialog-btn confirm-btn">发送</button>
+                </div>
+            </div>
+        </div>`;
+    jQuery_API(parentWin.document.body).append(dialogHtml);
+}
+
+
+export async function initializeUI() {
+    try {
+        const body = jQuery_API(parentWin.document.body);
+        if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length > 0) return true;
+
+        const coreJsUrl = new URL(import.meta.url);
+        const basePath = coreJsUrl.pathname.substring(0, coreJsUrl.pathname.lastIndexOf('/modules/ui_modules'));
+        const panelUrl = `${basePath}/panel.html`;
+        const cssUrl = `${basePath}/css/Theater.css`; // [妈妈的修复] 增加CSS的路径
+
+        console.log(`[Phone Sim] Fetching panel from: ${panelUrl}`);
+        const response = await fetch(panelUrl);
+        if (!response.ok) throw new Error(`Failed to fetch panel.html: ${response.status}`);
+        const templateHtml = await response.text();
+        if (!templateHtml) throw new Error("Fetched panel.html is empty.");
+
+        body.append(templateHtml);
+
+        // [妈妈的修复] 动态加载欲色剧场的CSS文件
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = cssUrl;
+        parentWin.document.head.appendChild(link);
+
+
+        if (body.find(`#${PhoneSim_Config.PANEL_ID}`).length === 0) {
+             throw new Error("Panel element not found in DOM after injection.");
         }
-    });
-    PhoneSim_UI.TheaterRenderer = RenderTheater.TheaterRenderer;
-};
 
+        _createToggleButton();
+        _createAuxiliaryElements();
 
-// [妈妈的修改] 以下核心函数从 core.js 移至此处，成为 ui.js 的一部分
-PhoneSim_UI.rerenderCurrentView = function(updates = {}) {
+        UI.populateApps();
+        UI.renderStickerPicker();
+        UI.applyCustomizations();
+        UI.addEventListeners();
+        UI.updateScaleAndPosition();
+
+        if (parentWin.document.readyState === "complete") {
+            const emojiScript = document.createElement('script');
+            emojiScript.type = 'module';
+            emojiScript.src = 'https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js';
+            parentWin.document.head.appendChild(emojiScript);
+        }
+
+        body.find(`#${PhoneSim_Config.PANEL_ID}`).hide();
+        return true;
+    } catch (error) {
+        console.error('[Phone Sim] CRITICAL UI Initialization Failure:', error);
+        if (parentWin.toastr) {
+            parentWin.toastr.error("手机模拟器插件UI加载失败，请检查控制台。", "严重错误", { timeOut: 10000 });
+        }
+        return false;
+    }
+}
+
+export function togglePanel(forceShow = null) {
+    const panel = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    const shouldShow = forceShow !== null ? forceShow : panel.is(':hidden');
+
+    PhoneSim_State.isPanelVisible = shouldShow;
+    PhoneSim_State.saveUiState();
+
+    if (shouldShow) {
+        panel.show();
+        UI.updateScaleAndPosition();
+        UI.updateTime();
+        DataHandler.fetchAllData().then(() => {
+            UI.rerenderCurrentView();
+        });
+    } else {
+        panel.hide();
+    }
+}
+
+export function rerenderCurrentView(updates = {}) {
     let activeId = null;
     const currentViewId = PhoneSim_State.currentView;
 
     switch(currentViewId) {
-        case 'ChatConversation':
-        case 'GroupMembers':
-        case 'GroupInvite':
+        case 'ChatConversation': case 'GroupMembers': case 'GroupInvite':
             activeId = PhoneSim_State.activeContactId; break;
         case 'Homepage':
             activeId = PhoneSim_State.activeProfileId; break;
@@ -73,18 +147,17 @@ PhoneSim_UI.rerenderCurrentView = function(updates = {}) {
             activeId = PhoneSim_State.activeLiveStreamId; break;
     }
 
-    PhoneSim_UI.renderViewContent(currentViewId, activeId);
+    renderViewContent(currentViewId, activeId);
 
     if (updates.chatUpdated && currentViewId === 'ChatApp') {
-        PhoneSim_UI.renderContactsList();
+        UI.renderContactsList();
     }
-    // [妈妈的修改] 关键修复！现在它知道当剧场数据更新时，需要重新渲染剧场视图。
     if (updates.theaterUpdated && currentViewId === 'TheaterApp') {
-        PhoneSim_UI.renderViewContent('TheaterApp');
+        renderViewContent('TheaterApp');
     }
-};
+}
 
-PhoneSim_UI.showView = function(viewId, ...args) {
+export function showView(viewId, ...args) {
     if (PhoneSim_State.isNavigating) return;
 
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
@@ -96,7 +169,7 @@ PhoneSim_UI.showView = function(viewId, ...args) {
 
     if (!nextView.length || (currentView.attr('id') === nextView.attr('id') && !args[0]?.forceRerender && !args[0]?.isTabSwitch)) {
         if (viewId === 'BrowserHistory' && currentView.attr('id') === nextView.attr('id')) {
-             PhoneSim_UI.renderViewContent(viewId, ...args);
+             renderViewContent(viewId, ...args);
         }
         return;
     }
@@ -126,7 +199,7 @@ PhoneSim_UI.showView = function(viewId, ...args) {
             break;
     }
 
-    PhoneSim_UI.renderViewContent(viewId, ...dataArgs);
+    renderViewContent(viewId, ...dataArgs);
     PhoneSim_State.currentView = viewId;
     PhoneSim_State.saveUiState();
 
@@ -169,49 +242,50 @@ PhoneSim_UI.showView = function(viewId, ...args) {
         nextView.removeClass(animationIn).css({ zIndex: 2, '--origin-x': '', '--origin-y': '' });
         PhoneSim_State.isNavigating = false;
     }, transitionDuration);
-};
+}
 
-PhoneSim_UI.renderViewContent = function(viewId, ...args) {
+
+export function renderViewContent(viewId, ...args) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     if (viewId === 'BrowserHistory') {
         const browserView = p.find('#browserapp-view');
         browserView.find('.browser-subview').removeClass('active');
         browserView.find('#browserhistory-view').addClass('active');
-        PhoneSim_UI.renderHistoryAndBookmarks();
+        UI.renderHistoryAndBookmarks();
         return;
     }
 
     switch(viewId) {
         case 'HomeScreen': break;
         case 'ChatApp':
-            PhoneSim_UI.renderContactsList(); PhoneSim_UI.renderContactsView(); PhoneSim_UI.renderDiscoverView(); PhoneSim_UI.renderMeView();
+            UI.renderContactsList(); UI.renderContactsView(); UI.renderDiscoverView(); UI.renderMeView();
             const activeTab = PhoneSim_State.activeSubviews.chatapp || 'messages';
             p.find('#chatapp-view .subview').removeClass('active').filter(`[data-subview="${activeTab}"]`).addClass('active');
             p.find('.chatapp-bottom-nav .nav-item').removeClass('active').filter(`[data-target="${activeTab}"]`).addClass('active');
             break;
-        case 'ChatConversation': PhoneSim_UI.renderChatView(args[0], 'WeChat'); break;
-        case 'GroupMembers': PhoneSim_UI.renderGroupMembersView(args[0]); break;
-        case 'GroupInvite': PhoneSim_UI.renderGroupInviteView(args[0]); break;
-        case 'GroupCreation': PhoneSim_UI.renderGroupCreationView(); break;
-        case 'Moments': PhoneSim_UI.renderMomentsView(); break;
-        case 'Homepage': PhoneSim_UI.renderHomepage(args[0]); break;
+        case 'ChatConversation': UI.renderChatView(args[0], 'WeChat'); break;
+        case 'GroupMembers': UI.renderGroupMembersView(args[0]); break;
+        case 'GroupInvite': UI.renderGroupInviteView(args[0]); break;
+        case 'GroupCreation': UI.renderGroupCreationView(); break;
+        case 'Moments': UI.renderMomentsView(); break;
+        case 'Homepage': UI.renderHomepage(args[0]); break;
         case 'PhoneApp':
-            PhoneSim_UI.renderPhoneContactList(); PhoneSim_UI.renderCallLogView();
+            UI.renderPhoneContactList(); UI.renderCallLogView();
             const activePhoneTab = PhoneSim_State.activeSubviews.phoneapp || 'contacts';
             p.find('#phoneapp-view .subview').removeClass('active').filter(`.phone-${activePhoneTab}-subview`).addClass('active');
             p.find('.phoneapp-bottom-nav .nav-item').removeClass('active').filter(`[data-target="${activePhoneTab}"]`).addClass('active');
             break;
-        case 'EmailApp': PhoneSim_UI.renderEmailList(); break;
-        case 'EmailDetail': PhoneSim_UI.renderEmailDetail(args[0]); break;
-        case 'SettingsApp': PhoneSim_UI.renderSettingsView(); break;
-        case 'BrowserApp': PhoneSim_UI.renderBrowserState(); break;
-        case 'ForumApp': PhoneSim_UI.renderForumBoardList(); break;
-        case 'ForumPostList': PhoneSim_UI.renderForumPostList(args[0]); break;
-        case 'ForumPostDetail': PhoneSim_UI.renderForumPostDetail(args[0]); break;
-        case 'LiveCenterApp': PhoneSim_UI.renderLiveBoardList(); break;
-        case 'LiveStreamList': PhoneSim_UI.renderLiveStreamList(args[0]); break;
-        case 'LiveStreamRoom': PhoneSim_UI.renderLiveStreamRoom(args[0]); break;
-        case 'TheaterApp': PhoneSim_UI.renderTheaterView(); break; // [妈妈的修改] 这一行是正确的，它将调用renderTheater.js里的函数
-        case 'Creation': PhoneSim_UI.renderCreationView(); break;
+        case 'EmailApp': UI.renderEmailList(); break;
+        case 'EmailDetail': UI.renderEmailDetail(args[0]); break;
+        case 'SettingsApp': UI.renderSettingsView(); break;
+        case 'BrowserApp': UI.renderBrowserState(); break;
+        case 'ForumApp': UI.renderForumBoardList(); break;
+        case 'ForumPostList': UI.renderForumPostList(args[0]); break;
+        case 'ForumPostDetail': UI.renderForumPostDetail(args[0]); break;
+        case 'LiveCenterApp': UI.renderLiveBoardList(); break;
+        case 'LiveStreamList': UI.renderLiveStreamList(args[0]); break;
+        case 'LiveStreamRoom': UI.renderLiveStreamRoom(args[0]); break;
+        case 'TheaterApp': UI.renderTheaterView(); break;
+        case 'Creation': UI.renderCreationView(); break;
     }
-};
+}
