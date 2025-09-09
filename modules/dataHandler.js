@@ -10,21 +10,22 @@ const modules = [Processor, Actions, Fetch, BrowserData, ForumData, LiveCenterDa
 
 export const PhoneSim_DataHandler = {};
 
-export { getOrCreatePhoneLorebook, clearLorebookCache } from './data_modules/actions.js';
+// 将关键函数直接挂载到主对象上，避免循环依赖问题
+Object.assign(PhoneSim_DataHandler, Actions);
+Object.assign(PhoneSim_DataHandler, Fetch);
 
 modules.forEach(module => {
     Object.keys(module).forEach(key => {
-        if (typeof module[key] === 'function' && key !== 'init') {
+        if (typeof module[key] === 'function' && key !== 'init' && !PhoneSim_DataHandler[key]) {
             PhoneSim_DataHandler[key] = module[key];
         }
     });
 });
 
-PhoneSim_DataHandler.init = (dependencies, uiHandler) => {
+PhoneSim_DataHandler.init = (dependencies, uiHandler, dataHandler) => {
     modules.forEach(module => {
         if (typeof module.init === 'function') {
-            // [修改] 确保数据处理器自身也被传递下去，解决循环依赖
-            module.init(dependencies, uiHandler, PhoneSim_DataHandler);
+            module.init(dependencies, uiHandler, dataHandler);
         }
     });
 };
