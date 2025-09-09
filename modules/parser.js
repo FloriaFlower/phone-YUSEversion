@@ -14,7 +14,7 @@ export const PhoneSim_Parser = {
         ];
 
         const combinedRegex = new RegExp(patterns.map(p => `(${p.regex.source})`).join('|'), 'g');
-        
+
         const parts = [];
         let lastIndex = 0;
         let match;
@@ -31,7 +31,7 @@ export const PhoneSim_Parser = {
                 const pat = patterns[i];
                 const individualRegex = new RegExp(`^${pat.regex.source}$`);
                 const individualMatch = matchedString.match(individualRegex);
-                
+
                 if (individualMatch) {
                     const obj = { type: pat.type };
                     if (pat.type === 'image') {
@@ -85,8 +85,75 @@ export const PhoneSim_Parser = {
         return params;
     },
 
+    // [新增] 辅助函数，用于解析包含.list-item的HTML字符串
+    _parseListItems: function(htmlString) {
+        if (!htmlString || typeof htmlString !== 'string') return [];
+        const items = [];
+        // 使用一个临时的DOM元素来解析HTML，这比正则表达式更健壮
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlString;
+        const listItems = tempDiv.querySelectorAll('.list-item');
+
+        listItems.forEach(itemNode => {
+            // itemNode.dataset 是一个DOMStringMap，包含了所有的data-*属性
+            // 我们需要把它转换成一个普通的JS对象
+            const itemData = { ...itemNode.dataset };
+            items.push(itemData);
+        });
+
+        return items;
+    },
+
+    // [新增] 专门用于解析欲色剧场数据的函数
+    parseTheaterData: function(rawText) {
+        const theaterRegex = /<yuse_data>.*?<announcements>(.*?)<\/announcements>.*?<customizations>(.*?)<\/customizations>.*?<theater>(.*?)<\/theater>.*?<theater_hot>(.*?)<\/theater_hot>.*?<theater_new>(.*?)<\/theater_new>.*?<theater_recommended>(.*?)<\/theater_recommended>.*?<theater_paid>(.*?)<\/theater_paid>.*?<shop>(.*?)<\/shop>.*?<\/yuse_data>/s;
+        const match = rawText.match(theaterRegex);
+
+        if (!match) {
+            return null;
+        }
+
+        // 匹配成功，现在解析每个捕获组
+        const [
+            , // 全匹配的字符串，我们不需要
+            announcementsHtml,
+            customizationsHtml,
+            theaterHtml,
+            theaterHotHtml,
+            theaterNewHtml,
+            theaterRecommendedHtml,
+            theaterPaidHtml,
+            shopHtml
+        ] = match;
+
+        const data = {
+            announcements: this._parseListItems(announcementsHtml),
+            customizations: this._parseListItems(customizationsHtml),
+            theater: this._parseListItems(theaterHtml),
+            theater_hot: this._parseListItems(theaterHotHtml),
+            theater_new: this._parseListItems(theaterNewHtml),
+            theater_recommended: this._parseListItems(theaterRecommendedHtml),
+            theater_paid: this._parseListItems(theaterPaidHtml),
+            shop: this._parseListItems(shopHtml)
+        };
+
+        return {
+            commandType: 'TheaterUpdate',
+            app: '欲色剧场',
+            type: '数据更新',
+            data: data
+        };
+    },
+
     parseCommand: function(r) {
         const trimmed = r.trim();
+
+        // [修改] 优先尝试解析欲色剧场的数据格式
+        const theaterData = this.parseTheaterData(trimmed);
+        if (theaterData) {
+            return theaterData;
+        }
+
         const commandMatch = trimmed.match(/^\s*\[app:([^,]+),\s*([\s\S]+)\]\s*$/);
         if (!commandMatch) return null;
 
@@ -96,7 +163,7 @@ export const PhoneSim_Parser = {
         if (!typeMatch) return null;
         const type = typeMatch[1].trim();
 
-        const isDataJsonCommand = (appName === '微信' && ['新动态', '更新资料', '更新动态'].includes(type)) 
+        const isDataJsonCommand = (appName === '微信' && ['新动态', '更新资料', '更新动态'].includes(type))
                                 || (appName === '论坛' && ['新帖子', '新回复'].includes(type))
                                 || (appName === '直播中心' && ['目录更新', '直播间状态'].includes(type));
         const isBrowserWebpage = (appName === '浏览器' && type === '网页');
@@ -153,7 +220,7 @@ export const PhoneSim_Parser = {
                 return null;
             }
         }
-        
+
         if (isBrowserWebpage) {
              const urlMatch = /url:\s*([^,]+)/.exec(paramsStr);
              const titleMatch = /title:\s*([^,]+)/.exec(paramsStr);
@@ -164,7 +231,7 @@ export const PhoneSim_Parser = {
                  console.error("[Phone Sim] Malformed '网页' command. Missing url, title, or content.", r);
                  return null;
              }
-             
+
              const contentStr = paramsStr.substring(contentIndex + contentKey.length).trim();
 
              try {
@@ -204,7 +271,7 @@ export const PhoneSim_Parser = {
                 snippet: params.snippet
             };
         }
-        
+
         if (finalMessage.app === '微信') {
              if (params.type === '私聊') {
                 if (params.from_id && params.to_id) { // New directed message format
@@ -287,12 +354,12 @@ export const PhoneSim_Parser = {
             finalMessage.contactId = params.id;
             return finalMessage;
         }
-        
+
         if (finalMessage.app === 'Email' && params.type === 'New') {
             finalMessage.commandType = 'App';
             return finalMessage;
         }
-        
+
         if (finalMessage.app === 'Phone' && params.type === 'IncomingCall') {
             finalMessage.commandType = 'App';
             return finalMessage;
@@ -300,7 +367,7 @@ export const PhoneSim_Parser = {
 
         return null;
     },
-    
+
     updateWorldDate: function(r) {
         const m = r.match(PhoneSim_Config.WORLD_STATE_REGEX);
         if (m && m[1] && m[2]) {
@@ -318,14 +385,14 @@ export const PhoneSim_Parser = {
             PhoneSim_State.worldDate = new Date();
         }
         const [h, m] = t.split(':').map(Number);
-    
+
         let baseDate = new Date(PhoneSim_State.worldDate);
-    
+
         if (lastTimestampStr) {
             const lastDate = new Date(lastTimestampStr);
             const lastTime = lastDate.getHours() * 60 + lastDate.getMinutes();
             const currentTime = h * 60 + m;
-    
+
             if (currentTime < lastTime) {
                 baseDate = new Date(lastDate.getTime());
                 baseDate.setDate(baseDate.getDate() + 1);
@@ -333,7 +400,7 @@ export const PhoneSim_Parser = {
                 baseDate = new Date(lastDate.getTime());
             }
         }
-    
+
         baseDate.setHours(h, m, 0, 0);
         return baseDate.toISOString();
     },
@@ -349,3 +416,4 @@ export const PhoneSim_Parser = {
         return l.toISOString();
     }
 };
+
