@@ -32,10 +32,9 @@ export function getBoardNameById(boardId, context) {
         if (PRESET_LIVE_BOARDS[boardId]) {
             return PRESET_LIVE_BOARDS[boardId].name;
         }
-        // Custom live boards are not a feature, but this is a safe fallback
         return PhoneSim_State.liveCenterData[boardId]?.boardName || boardId;
     }
-    return boardId; // Fallback
+    return boardId;
 }
 
 
@@ -76,7 +75,7 @@ export async function fetchAllBrowserData() {
 
         const browserDb = browserDbEntry ? JSON.parse(browserDbEntry.content || '{}') : {};
 
-        PhoneSim_State.persistentBrowserHistory = browserDb.history || []; // For the library view
+        PhoneSim_State.persistentBrowserHistory = browserDb.history || [];
         PhoneSim_State.browserData = browserDb.pages || {};
         PhoneSim_State.browserBookmarks = browserDb.bookmarks || [];
         PhoneSim_State.browserDirectory = browserDb.directory || {};
@@ -116,7 +115,6 @@ export async function fetchAllLiveCenterData() {
     }
 }
 
-// [新增] 为欲色剧场App获取数据的专用函数
 export async function fetchAllTheaterData() {
     const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) {
@@ -133,7 +131,6 @@ export async function fetchAllTheaterData() {
     }
 }
 
-
 export async function fetchAllData() {
     await fetchAllContacts();
     await fetchAllEmails();
@@ -142,7 +139,8 @@ export async function fetchAllData() {
     await fetchAllBrowserData();
     await fetchAllForumData();
     await fetchAllLiveCenterData();
-    await fetchAllTheaterData(); // [修改] 调用新增的函数
+    // [妈妈的修改] 这里直接调用我们在这个文件里写的函数就好啦
+    await fetchAllTheaterData();
     await fetchAllDirectoryAndRequests();
     UI.updateGlobalUnreadCounts();
 }
@@ -185,7 +183,6 @@ export async function fetchAllCallLogs() {
     }
 }
 
-
 export async function fetchAllContacts() {
     const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
     if (!lorebookName) {
@@ -210,7 +207,6 @@ export async function fetchAllContacts() {
             const contact = dbData[contactId];
             if (!contact.profile) continue;
 
-            // This now works for both users and groups if they have the flag.
             if (contact.profile.has_custom_avatar && avatarData[contactId]) {
                 contact.profile.avatar = avatarData[contactId];
             }
