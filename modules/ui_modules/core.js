@@ -58,7 +58,7 @@ export async function initializeUI() {
         const coreJsUrl = new URL(import.meta.url);
         const basePath = coreJsUrl.pathname.substring(0, coreJsUrl.pathname.lastIndexOf('/modules/ui_modules'));
         const panelUrl = `${basePath}/panel.html`;
-        const cssUrl = `${basePath}/css/Theater.css`; // [妈妈的修复] 增加CSS的路径
+        const cssUrl = `${basePath}/css/Theater.css`; // [妈妈的修复] 定义我们专属CSS的路径
 
         console.log(`[Phone Sim] Fetching panel from: ${panelUrl}`);
         const response = await fetch(panelUrl);
@@ -68,11 +68,12 @@ export async function initializeUI() {
 
         body.append(templateHtml);
 
-        // [妈妈的修复] 动态加载欲色剧场的CSS文件
+        // [妈妈的修复] 关键修复！动态加载欲色剧场的CSS文件
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.type = 'text/css';
         link.href = cssUrl;
+        // 我们要把它加到父窗口的头部，才能对插件生效
         parentWin.document.head.appendChild(link);
 
 
@@ -152,6 +153,7 @@ export function rerenderCurrentView(updates = {}) {
     if (updates.chatUpdated && currentViewId === 'ChatApp') {
         UI.renderContactsList();
     }
+    // [妈妈的修复] 关键修复！当剧场数据更新时，确保刷新界面
     if (updates.theaterUpdated && currentViewId === 'TheaterApp') {
         renderViewContent('TheaterApp');
     }
@@ -225,7 +227,6 @@ export function showView(viewId, ...args) {
             currentView.css({ '--origin-x': `${originX}px`, '--origin-y': `${originY}px` });
         } else { animationOut = 'slide-out-to-bottom'; }
     } else if (options.isTabSwitch) {
-        // No change, fade-in/out is default
     } else if (nextLevel > currentLevel) {
         animationIn = 'slide-in-from-right'; animationOut = 'slide-out-to-left';
     } else if (nextLevel < currentLevel) {
@@ -285,6 +286,7 @@ export function renderViewContent(viewId, ...args) {
         case 'LiveCenterApp': UI.renderLiveBoardList(); break;
         case 'LiveStreamList': UI.renderLiveStreamList(args[0]); break;
         case 'LiveStreamRoom': UI.renderLiveStreamRoom(args[0]); break;
+        // [妈妈的修复] 关键修复！现在调度中心知道如何渲染剧场了
         case 'TheaterApp': UI.renderTheaterView(); break;
         case 'Creation': UI.renderCreationView(); break;
     }
