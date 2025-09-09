@@ -1,21 +1,21 @@
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
-import { PhoneSim_Sounds } from '../sounds.js';
 
 let jQuery_API, parentWin, UI;
 
-export function init(deps, dataHandler, uiObject) {
+function init(deps, dataHandler, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
     UI = uiObject;
 }
 
-function renderTheaterView(initialPage = 'announcements') {
+// 主渲染函数，负责构建整个App的框架
+function renderTheaterView() {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     const view = p.find('#theaterapp-view');
-    const contentWrapper = view.find('.app-content-wrapper');
 
-    if (contentWrapper.length === 0) {
+    // 只在首次加载时构建框架
+    if (view.find('.app-content-wrapper').length === 0) {
         view.empty().append(`
             <div class="app-header">
                 <button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button>
@@ -30,24 +30,32 @@ function renderTheaterView(initialPage = 'announcements') {
                 <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
                 <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
             </div>
+             <div id="theater-modal" class="theater-modal-overlay">
+                <div class="theater-modal-content">
+                    <div class="theater-modal-header"></div>
+                    <div class="theater-modal-body"></div>
+                    <div class="theater-modal-footer"></div>
+                    <button class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
         `);
     }
-
-    TheaterRenderer.switchPage(initialPage);
-    TheaterRenderer.updateNav(initialPage);
+    // 默认显示第一个页面
+    switchPage('announcements');
+    updateNav('announcements');
 }
 
 function switchPage(pageName) {
     const contentArea = jQuery_API(parentWin.document.body).find('#theater-content-area');
     contentArea.empty();
-
     switch (pageName) {
         case 'announcements': _renderAnnouncementsPage(contentArea); break;
-        case 'customizations':  _renderCustomizationsPage(contentArea); break;
-        case 'theater':         _renderTheaterPage(contentArea); break;
-        case 'shop':            _renderShopPage(contentArea); break;
-        default:                contentArea.html('<p class="empty-list">页面不存在</p>');
+        case 'customizations': _renderCustomizationsPage(contentArea); break;
+        case 'theater': renderTheaterPage(contentArea); break; // [妈妈的修复] 调用公共的渲染函数
+        case 'shop': _renderShopPage(contentArea); break;
+        default: contentArea.html('<p class="empty-list">页面不存在</p>');
     }
+    updateNav(pageName);
 }
 
 function updateNav(activePage) {
@@ -55,6 +63,8 @@ function updateNav(activePage) {
     navButtons.removeClass('active');
     navButtons.filter(`[data-page="${activePage}"]`).addClass('active');
 }
+
+// === 子页面渲染函数 ===
 
 function _renderAnnouncementsPage(container) {
     const headerHtml = `<div class="theater-page-header"><h2>通告列表</h2><button class="theater-refresh-btn" data-page="announcements" title="刷新通告"><i class="fas fa-sync-alt"></i></button></div>`;
@@ -70,27 +80,39 @@ function _renderCustomizationsPage(container) {
     container.html(headerHtml + `<div class="list-container">${listHtml}</div>`);
 }
 
-function _renderTheaterPage(container, filter = 'all') {
+// [妈妈的修复] 将_renderTheaterPage变为公共函数，这样外部的筛选器才能调用它
+function renderTheaterPage(container, filter = 'all') {
     const headerHtml = `<div class="theater-page-header"><h2>剧场列表</h2><button class="theater-refresh-btn" data-page="theater" title="刷新剧场"><i class="fas fa-sync-alt"></i></button></div>`;
-    const filtersHtml = `<div class="theater-filters"><button class="filter-btn ${filter === 'all' ? 'active' : ''}" data-filter="all">全部</button><button class="filter-btn ${filter === 'hot' ? 'active' : ''}" data-filter="hot">🔥 最热</button><button class="filter-btn ${filter === 'new' ? 'active' : ''}" data-filter="new">🆕 最新</button><button class="filter-btn ${filter === 'recommended' ? 'active' : ''}" data-filter="recommended">❤️ 推荐</button><button class="filter-btn ${filter === 'paid' ? 'active' : ''}" data-filter="paid">💸 高价定制</button></div>`;
+    const filtersHtml = `
+        <div class="theater-filters">
+            <button class="filter-btn ${filter === 'all' ? 'active' : ''}" data-filter="all">全部</button>
+            <button class="filter-btn ${filter === 'hot' ? 'active' : ''}" data-filter="hot">🔥 最热</button>
+            <button class="filter-btn ${filter === 'new' ? 'active' : ''}" data-filter="new">🆕 最新</button>
+            <button class="filter-btn ${filter === 'recommended' ? 'active' : ''}" data-filter="recommended">❤️ 推荐</button>
+            <button class="filter-btn ${filter === 'paid' ? 'active' : ''}" data-filter="paid">💸 高价定制</button>
+        </div>`;
+
     let itemsToShow = [];
+    const data = PhoneSim_State.theaterData || {};
     switch(filter) {
-        case 'hot':         itemsToShow = PhoneSim_State.theaterData?.theater_hot || []; break;
-        case 'new':         itemsToShow = PhoneSim_State.theaterData?.theater_new || []; break;
-        case 'recommended': itemsToShow = PhoneSim_State.theaterData?.theater_recommended || []; break;
-        case 'paid':        itemsToShow = PhoneSim_State.theaterData?.theater_paid || []; break;
-        default:            itemsToShow = PhoneSim_State.theaterData?.theater || [];
+        case 'hot': itemsToShow = data.theater_hot || []; break;
+        case 'new': itemsToShow = data.theater_new || []; break;
+        case 'recommended': itemsToShow = data.theater_recommended || []; break;
+        case 'paid': itemsToShow = data.theater_paid || []; break;
+        default: itemsToShow = data.theater || [];
     }
     const listHtml = itemsToShow.length > 0 ? itemsToShow.map(item => _createListItem(item, 'theater')).join('') : '<p class="empty-list">该分类下还没有作品。</p>';
     container.html(headerHtml + filtersHtml + `<div class="list-container" id="theater-list-container">${listHtml}</div>`);
 }
 
 function _renderShopPage(container) {
-    const headerHtml = `<div class="theater-page-header"><h2>洛洛商城</h2><button class="theater-refresh-btn" data-page="shop" title="刷新商城"><i class="fas fa-sync-alt"></i></button></div>`;
+    const headerHtml = `<div class="theater-page-header"><h2>欲色商城</h2><button class="theater-refresh-btn" data-page="shop" title="刷新商城"><i class="fas fa-sync-alt"></i></button></div>`;
     const shopItems = PhoneSim_State.theaterData?.shop || [];
     const listHtml = shopItems.length > 0 ? shopItems.map(item => _createListItem(item, 'shop')).join('') : '<p class="empty-list">商城正在补货中...</p>';
     container.html(headerHtml + `<div class="list-container">${listHtml}</div>`);
 }
+
+// === 辅助渲染函数 ===
 
 function _createListItem(item, type) {
     let metaHtml = '', actionsHtml = '', dataAttributes = '';
@@ -118,13 +140,18 @@ function _createListItem(item, type) {
     return `<div class="list-item" data-type="${type}" ${dataAttributes}><div class="item-title">${item.title || item.name}</div><div class="item-meta">${metaHtml}</div>${actionsHtml}</div>`;
 }
 
-function showDetailModal(type, itemData) {
+// [妈妈的修复] 重命名函数以保持一致，并确保它能正确地找到并操作弹窗
+function showTheaterDetailModal(type, itemData) {
     const modal = jQuery_API(parentWin.document.body).find('#theater-modal');
+    if (!modal.length) { console.error("Theater modal not found!"); return; }
+
     const header = modal.find('.theater-modal-header');
     const body = modal.find('.theater-modal-body');
     const footer = modal.find('.theater-modal-footer');
-    let headerHtml = '', bodyHtml = '', footerHtml = '';
+    // 把数据暂存到模态框上，方便事件处理器获取
+    modal.find('.theater-modal-content').data('item', itemData);
 
+    let headerHtml = '', bodyHtml = '', footerHtml = '';
     switch (type) {
         case 'announcement':
             headerHtml = itemData.title;
@@ -157,31 +184,19 @@ function showDetailModal(type, itemData) {
 function _renderComments(reviews) {
     if (!reviews) return '<p>暂无评论。</p>';
     let reviewsArray = [];
-    if (typeof reviews === 'string') {
-        try {
-            // [妈妈的修复] 增加对 reviews 可能是 'undefined' 字符串的兼容
-            if (reviews === 'undefined' || reviews.trim() === '') return '<p>暂无评论。</p>';
-            reviewsArray = JSON.parse(reviews.replace(/'/g, '"'));
-        } catch (e) {
-            console.error("解析评论失败:", e, reviews);
-            return '<p>评论加载失败。</p>';
-        }
-    } else if (Array.isArray(reviews)) {
-        reviewsArray = reviews;
-    }
-
-    if (reviewsArray.length === 0) return '<p>暂无评论。</p>';
-
+    try {
+        reviewsArray = typeof reviews === 'string' ? JSON.parse(reviews.replace(/'/g, '"')) : reviews;
+    } catch (e) { console.error("解析评论失败:", e, reviews); return '<p>评论加载失败。</p>'; }
+    if (!Array.isArray(reviewsArray) || reviewsArray.length === 0) return '<p>暂无评论。</p>';
     return reviewsArray.map(r => `<div class="comment"><span class="comment-user">${r.user}:</span> ${r.text}</div>`).join('');
 }
 
-
+// [妈妈的修复] 导出正确的、经过重构的对象
 export const TheaterRenderer = {
     init,
     renderTheaterView,
-    showDetailModal,
+    renderTheaterPage, // 导出此函数供筛选器使用
+    showTheaterDetailModal, // 导出正确的弹窗函数名
     switchPage,
-    updateNav,
-    // [妈妈的修复] 将内部渲染函数也暴露出来，供core.js里的筛选器逻辑调用
-    _renderTheaterPage,
+    updateNav
 };
