@@ -1,3 +1,4 @@
+
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
@@ -212,4 +213,3 @@ export function addEventListeners() {
     UI.makeDraggable(p);
     jQuery_API(parentWin).on('resize.phonesim', () => UI.updateScaleAndPosition());
 }
-
