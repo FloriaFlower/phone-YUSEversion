@@ -1,8 +1,7 @@
-import { PhoneSim_Config } from '../../config.js';
-import { PhoneSim_State } from '../state.js';
-import { PhoneSim_Sounds } from '../sounds.js';
-// 引入数据加载方法
-import { fetchAllTheaterData } from './theaterData.js';
+import { PhoneSim_Config } from '../../config.js'; 
+import { PhoneSim_State } from '../../state.js';   
+import { PhoneSim_Sounds } from '../../sounds.js'; 
+import { fetchAllTheaterData } from '../../data_modules/theaterData.js';
 
 let jQuery_API, parentWin, UI;
 let isInitialized = false;
@@ -13,10 +12,8 @@ export function init(deps, uiObject) {
     parentWin = deps.win;
     UI = uiObject;
     _injectBaseStyles();
-    // 初始化时加载数据（关键修复：确保渲染前有数据）
     fetchAllTheaterData().then(() => {
         isInitialized = true;
-        // 数据加载后如果已打开剧场，重新渲染
         if (PhoneSim_State.currentView === 'theaterapp') {
             renderTheaterView();
         }
