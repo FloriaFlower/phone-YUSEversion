@@ -1,6 +1,7 @@
-import { PhoneSim_Config } from '../../config.js'; 
-import { PhoneSim_State } from '../../state.js';   
-import { PhoneSim_Parser } from '../../parser.js'; 
+import { PhoneSim_Config } from '../../config.js';
+import { PhoneSim_State } from '../state.js';
+// 新增：引入 parser 的 HTML 解析函数
+import { _parseListItems } from './parser.js';
 
 let UI, DataHandler;
 
@@ -9,6 +10,7 @@ export function init(deps, uiHandler, dataHandler) {
     DataHandler = dataHandler;
 }
 
+// 保留原 DEFAULT_THEATER_DATA 内容不变（此处省略，因含敏感内容）
 const DEFAULT_THEATER_DATA = {
     announcements: `<div class="list-item" data-id="anno_1" data-type="announcement" data-title="【S级制作】《深海囚笼》双人水下摄影" data-description="与一线男演员温言合作，在特制水下摄影棚完成。剧情涉及人鱼主题，包含大量湿身、束缚、以及水中亲密互动。要求表现出窒息与沉溺的极致美感。拍摄周期3天，需要极佳的水性和镜头表现力。" data-actor="温言" data-location="海蓝市'深海之梦'水下摄影棚" data-payment="片酬200,000 + 15%平台分成">
   <div class="item-title">【S级制作】《深海囚笼》双人水下摄影</div>
@@ -355,38 +357,64 @@ const DEFAULT_THEATER_DATA = {
 export async function fetchAllTheaterData() {
     try {
         const theaterDb = await DataHandler._fetchFromWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE);
+        let parsedData = {};
+
+        // 解析数据库数据或默认 HTML 为对象数组
         if (theaterDb && Object.keys(theaterDb).length > 0 && theaterDb.announcements) {
-            PhoneSim_State.yuseTheaterData = theaterDb;
-            PhoneSim_State.theaterData = theaterDb;
-        } else {
-            // 用正确路径引入的PhoneSim_Parser解析样板数据
-            const parsedData = {
-                announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
-                customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
-                theater: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater),
-                theater_hot: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_hot),
-                theater_new: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_new),
-                theater_recommended: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
-                theater_paid: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_paid),
-                shop: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.shop)
+            parsedData = {
+                announcements: _parseListItems(theaterDb.announcements),
+                customizations: _parseListItems(theaterDb.customizations),
+                theater: _parseListItems(theaterDb.theater),
+                theater_hot: _parseListItems(theaterDb.theater_hot),
+                theater_new: _parseListItems(theaterDb.theater_new),
+                theater_recommended: _parseListItems(theaterDb.theater_recommended),
+                theater_paid: _parseListItems(theaterDb.theater_paid),
+                shop: _parseListItems(theaterDb.shop)
             };
-            PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
-            PhoneSim_State.theaterData = parsedData;
+        } else {
+            // 解析默认 HTML 数据
+            parsedData = {
+                announcements: _parseListItems(DEFAULT_THEATER_DATA.announcements),
+                customizations: _parseListItems(DEFAULT_THEATER_DATA.customizations),
+                theater: _parseListItems(DEFAULT_THEATER_DATA.theater),
+                theater_hot: _parseListItems(DEFAULT_THEATER_DATA.theater_hot),
+                theater_new: _parseListItems(DEFAULT_THEATER_DATA.theater_new),
+                theater_recommended: _parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
+                theater_paid: _parseListItems(DEFAULT_THEATER_DATA.theater_paid),
+                shop: _parseListItems(DEFAULT_THEATER_DATA.shop)
+            };
         }
-    } catch (e) {
-        console.error('[Phone Sim] Error fetching Yuse Theater data.', e);
-        // 出错时的解析逻辑保持原样
-        const parsedData = {
-            announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
-            customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
-            theater: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater),
-            theater_hot: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_hot),
-            theater_new: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_new),
-            theater_recommended: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
-            theater_paid: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_paid),
-            shop: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.shop)
-        };
-        PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
+
+        // 同步到 renderTheater 依赖的全局状态
         PhoneSim_State.theaterData = parsedData;
+    } catch (e) {
+        console.error('[Phone Sim] Error fetching Yuse Theater data. Falling back to default data.', e);
+        // 异常时加载默认解析数据
+        PhoneSim_State.theaterData = {
+            announcements: _parseListItems(DEFAULT_THEATER_DATA.announcements),
+            customizations: _parseListItems(DEFAULT_THEATER_DATA.customizations),
+            theater: _parseListItems(DEFAULT_THEATER_DATA.theater),
+            theater_hot: _parseListItems(DEFAULT_THEATER_DATA.theater_hot),
+            theater_new: _parseListItems(DEFAULT_THEATER_DATA.theater_new),
+            theater_recommended: _parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
+            theater_paid: _parseListItems(DEFAULT_THEATER_DATA.theater_paid),
+            shop: _parseListItems(DEFAULT_THEATER_DATA.shop)
+        };
     }
 }
+
+// saveTheaterData 函数保持不变（保存原始 HTML 格式，加载时再解析）
+export async function saveTheaterData(data, msgId) {
+    await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, () => {
+        return {
+            sourceMsgId: msgId,
+            timestamp: new Date().toISOString(),
+            ...data
+        };
+    });
+    await fetchAllTheaterData();
+    if (PhoneSim_State.currentView === 'theaterapp') {
+        UI.renderTheaterView();
+    }
+}
+
