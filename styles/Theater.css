@@ -278,3 +278,22 @@
     border-bottom-right-radius: 20px;
     flex-shrink: 0;
 }
+
+/* 导航栏固定定位修复 */
+.theater-footer-nav {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 100 !important; /* 确保在内容上方 */
+}
+/* 内容区预留底部空间 */
+.app-content-wrapper {
+    padding-bottom: 60px !important;
+}
+/* 避免按钮重复点击导致的样式异常 */
+.nav-btn.active {
+    color: #007aff !important;
+    font-weight: bold !important;
+}
+
