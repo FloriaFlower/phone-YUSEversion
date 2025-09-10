@@ -1,5 +1,4 @@
-// 1. 导入路径用绝对化写法（避免移动端路径解析偏差）
-import { PhoneSim_Config } from '../config.js'; // 注意：若config.js在modules根目录，路径是'../config.js'
+import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 
 let TavernHelper_API, parentWin, UI, DataHandler;
@@ -11,48 +10,210 @@ export function init(deps, uiHandler, dataHandler) {
     DataHandler = dataHandler;
 }
 
-// 2. 核心：fetchAllData改为同步初始化（避免await阻塞）
-export function fetchAllData() {
+const PRESET_FORUM_BOARDS = {
+    "campus_life": "校园生活",
+    "academic_exchange": "学术交流"
+};
+
+const PRESET_LIVE_BOARDS = {
+    "hot_games": { name: "热门游戏" },
+    "music_station": { name: "欲色专区" },
+    "life_chat": { name: "生活闲聊" }
+};
+
+export function getBoardNameById(boardId, context) {
+    if (context === 'forum') {
+        if (PRESET_FORUM_BOARDS[boardId]) {
+            return PRESET_FORUM_BOARDS[boardId];
+        }
+        return PhoneSim_State.forumData[boardId]?.boardName || boardId;
+    }
+    if (context === 'live') {
+        if (PRESET_LIVE_BOARDS[boardId]) {
+            return PRESET_LIVE_BOARDS[boardId].name;
+        }
+        return PhoneSim_State.liveCenterData[boardId]?.boardName || boardId;
+    }
+    return boardId;
+}
+
+
+async function fetchAllDirectoryAndRequests() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.pendingFriendRequests = [];
+        return;
+    }
     try {
-        // 先同步初始化核心数据（避免异步失败）
-        PhoneSim_State.contacts = PhoneSim_State.contacts || {};
-        PhoneSim_State.emails = PhoneSim_State.emails || [];
-        PhoneSim_State.callLogs = PhoneSim_State.callLogs || [];
-        PhoneSim_State.forumData = PhoneSim_State.forumData || {};
-        PhoneSim_State.liveCenterData = PhoneSim_State.liveCenterData || {};
-        PhoneSim_State.theaterData = PhoneSim_State.theaterData || { announcements: [], customizations: [], theater: [], shop: [] };
-        
-        // 异步数据放最后，失败不影响UI
-        setTimeout(async () => {
-            try {
-                await fetchAllContacts();
-                await fetchAllEmails();
-                await fetchAllTheaterData();
-                if (UI && UI.updateGlobalUnreadCounts) UI.updateGlobalUnreadCounts();
-            } catch (err) {}
-        }, 1000); // 延迟1秒，确保UI先加载
-        
-    } catch (err) {
-        // 静默失败
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const dirEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_DIR_NAME);
+        if (dirEntry) {
+            const dirData = JSON.parse(dirEntry.content || '{}');
+            PhoneSim_State.pendingFriendRequests = dirData.friend_requests || [];
+        } else {
+            PhoneSim_State.pendingFriendRequests = [];
+        }
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch directory and friend requests:', er);
+        PhoneSim_State.pendingFriendRequests = [];
     }
 }
 
-// 3. 剧场数据加载简化（只初始化，不调用API）
-export async function fetchAllTheaterData() {
-    PhoneSim_State.theaterData = {
-        announcements: [{ title: '测试通告', actor: '洛洛' }],
-        customizations: [],
-        theater: [],
-        shop: []
-    };
+
+export async function fetchAllBrowserData() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.persistentBrowserHistory = [];
+        PhoneSim_State.browserData = {};
+        PhoneSim_State.browserBookmarks = [];
+        PhoneSim_State.browserDirectory = {};
+        return;
+    }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const browserDbEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_BROWSER_DATABASE);
+
+        const browserDb = browserDbEntry ? JSON.parse(browserDbEntry.content || '{}') : {};
+
+        PhoneSim_State.persistentBrowserHistory = browserDb.history || [];
+        PhoneSim_State.browserData = browserDb.pages || {};
+        PhoneSim_State.browserBookmarks = browserDb.bookmarks || [];
+        PhoneSim_State.browserDirectory = browserDb.directory || {};
+
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch browser data:', er);
+        PhoneSim_State.persistentBrowserHistory = [];
+        PhoneSim_State.browserData = {};
+        PhoneSim_State.browserBookmarks = [];
+        PhoneSim_State.browserDirectory = {};
+    }
 }
 
-// 其他函数保持最简（省略重复代码，只保留核心）
-export async function fetchAllContacts() { /* 原有最简逻辑 */ }
-export async function fetchAllEmails() { /* 原有最简逻辑 */ }
-export function getBoardNameById(boardId, context) { return boardId; }
-export async function fetchAllBrowserData() {}
-export async function fetchAllForumData() {}
-export async function fetchAllLiveCenterData() {}
-export async function fetchAllMoments() {}
-export async function fetchAllCallLogs() {}
+export async function fetchAllForumData() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) { PhoneSim_State.forumData = {}; return; }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const forumEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_FORUM_DATABASE);
+        PhoneSim_State.forumData = forumEntry ? JSON.parse(forumEntry.content || '{}') : {};
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch forum data:', er);
+        PhoneSim_State.forumData = {};
+    }
+}
+
+export async function fetchAllLiveCenterData() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) { PhoneSim_State.liveCenterData = {}; return; }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const liveCenterEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_LIVECENTER_DATABASE);
+        PhoneSim_State.liveCenterData = liveCenterEntry ? JSON.parse(liveCenterEntry.content || '{}') : {};
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch live center data:', er);
+        PhoneSim_State.liveCenterData = {};
+    }
+}
+
+export async function fetchAllTheaterData() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.theaterData = {};
+        return;
+    }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const theaterEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_THEATER_DATABASE);
+        PhoneSim_State.theaterData = theaterEntry ? JSON.parse(theaterEntry.content || '{}') : {};
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch theater data:', er);
+        PhoneSim_State.theaterData = {};
+    }
+}
+
+export async function fetchAllData() {
+    await fetchAllContacts();
+    await fetchAllEmails();
+    await fetchAllMoments();
+    await fetchAllCallLogs();
+    await fetchAllBrowserData();
+    await fetchAllForumData();
+    await fetchAllLiveCenterData();
+    // [妈妈的修改] 这里直接调用我们在这个文件里写的函数就好啦
+    await fetchAllTheaterData();
+    await fetchAllDirectoryAndRequests();
+    UI.updateGlobalUnreadCounts();
+}
+
+export async function fetchAllMoments() {
+    let allMoments = [];
+    for (const contactId in PhoneSim_State.contacts) {
+        const contact = PhoneSim_State.contacts[contactId];
+        if (contact.moments && Array.isArray(contact.moments)) {
+            allMoments.push(...contact.moments);
+        }
+    }
+    allMoments.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+    PhoneSim_State.moments = allMoments;
+}
+
+export async function fetchAllEmails() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) { PhoneSim_State.emails = []; return; }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const emailEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_EMAIL_DB_NAME);
+        PhoneSim_State.emails = emailEntry ? JSON.parse(emailEntry.content || '[]') : [];
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch emails:', er);
+        PhoneSim_State.emails = [];
+    }
+}
+
+export async function fetchAllCallLogs() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) { PhoneSim_State.callLogs = []; return; }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const callLogEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_CALL_LOG_DB_NAME);
+        PhoneSim_State.callLogs = callLogEntry ? JSON.parse(callLogEntry.content || '[]') : [];
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch call logs:', er);
+        PhoneSim_State.callLogs = [];
+    }
+}
+
+export async function fetchAllContacts() {
+    const lorebookName = await DataHandler.getOrCreatePhoneLorebook();
+    if (!lorebookName) {
+        PhoneSim_State.contacts = {};
+        return;
+    }
+    try {
+        const entries = await TavernHelper_API.getWorldbook(lorebookName);
+        const dbEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_DB_NAME);
+        const avatarEntry = entries.find(e => e.name === PhoneSim_Config.WORLD_AVATAR_DB_NAME);
+
+        const dbData = dbEntry ? JSON.parse(dbEntry.content || '{}') : {};
+        const avatarData = avatarEntry ? JSON.parse(avatarEntry.content || '{}') : {};
+
+        if (avatarData[PhoneSim_Config.PLAYER_ID]) {
+            PhoneSim_State.customization.playerAvatar = avatarData[PhoneSim_Config.PLAYER_ID];
+        }
+
+        delete dbData.plugin_customization_data;
+
+        for (const contactId in dbData) {
+            const contact = dbData[contactId];
+            if (!contact.profile) continue;
+
+            if (contact.profile.has_custom_avatar && avatarData[contactId]) {
+                contact.profile.avatar = avatarData[contactId];
+            }
+        }
+        PhoneSim_State.contacts = dbData;
+    } catch (er) {
+        console.error('[Phone Sim] Failed to fetch all contacts:', er);
+        PhoneSim_State.contacts = {};
+    }
+}
