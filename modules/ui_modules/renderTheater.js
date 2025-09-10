@@ -1,7 +1,8 @@
-import { PhoneSim_Config } from '../../config.js'; 
-import { PhoneSim_State } from '../../state.js';   
-import { PhoneSim_Sounds } from '../../sounds.js'; 
-import { fetchAllTheaterData } from '../../data_modules/theaterData.js';
+import { PhoneSim_Config } from '../../config.js';
+import { PhoneSim_State } from '../state.js';
+import { PhoneSim_Sounds } from '../sounds.js';
+// 新增：引入数据加载函数
+import { fetchAllTheaterData } from './theaterData.js';
 
 let jQuery_API, parentWin, UI;
 let isInitialized = false;
@@ -12,12 +13,9 @@ export function init(deps, uiObject) {
     parentWin = deps.win;
     UI = uiObject;
     _injectBaseStyles();
-    fetchAllTheaterData().then(() => {
-        isInitialized = true;
-        if (PhoneSim_State.currentView === 'theaterapp') {
-            renderTheaterView();
-        }
-    });
+    // 新增：初始化时加载剧场数据
+    fetchAllTheaterData();
+    isInitialized = true;
 }
 
 function _injectBaseStyles() {
@@ -33,12 +31,6 @@ function _injectBaseStyles() {
 }
 
 export function renderTheaterView(initialPage = 'announcements') {
-    // 等待初始化完成（数据加载完毕）
-    if (!isInitialized) {
-        setTimeout(() => renderTheaterView(initialPage), 100);
-        return;
-    }
-
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let view = p.find('#theaterapp-view');
     
@@ -102,8 +94,6 @@ function _bindEvents() {
         if (prompt) {
             await UI.triggerAIGeneration(prompt);
         }
-        // 刷新时重新加载数据
-        await fetchAllTheaterData();
         switchPage(page);
     });
     
@@ -129,7 +119,7 @@ function switchPage(pageName) {
                     <h2>通告列表</h2>
                     <button class="theater-refresh-btn" data-page="announcements"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('announcements')}</div>
+                <div class="list-container">${_renderListHtml('announcements')}</div>
             `);
             break;
         case 'customizations':
@@ -138,7 +128,7 @@ function switchPage(pageName) {
                     <h2>粉丝定制</h2>
                     <button class="theater-refresh-btn" data-page="customizations"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('customizations')}</div>
+                <div class="list-container">${_renderListHtml('customizations')}</div>
             `);
             break;
         case 'theater':
@@ -154,17 +144,8 @@ function switchPage(pageName) {
                     <button class="filter-btn" data-filter="recommended">❤️ 推荐</button>
                     <button class="filter-btn" data-filter="paid">💸 高价定制</button>
                 </div>
-                <div class="list-container">${_getListHtml('theater')}</div>
+                <div class="list-container">${_renderListHtml('theater')}</div>
             `);
-            // 绑定筛选按钮事件
-            contentArea.find('.filter-btn').on('click', function() {
-                const filter = jQuery_API(this).data('filter');
-                contentArea.find('.filter-btn').removeClass('active');
-                jQuery_API(this).addClass('active');
-                // 根据筛选加载对应数据
-                const listHtml = filter === 'all' ? _getListHtml('theater') : _getListHtml(`theater_${filter}`);
-                contentArea.find('.list-container').html(listHtml);
-            });
             break;
         case 'shop':
             contentArea.html(`
@@ -172,7 +153,7 @@ function switchPage(pageName) {
                     <h2>欲色商城</h2>
                     <button class="theater-refresh-btn" data-page="shop"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('shop')}</div>
+                <div class="list-container">${_renderListHtml('shop')}</div>
             `);
             break;
         default:
@@ -180,9 +161,8 @@ function switchPage(pageName) {
     }
 }
 
-// 关键修复：从全局状态获取解析后的对象数组，而非原始HTML
-function _getListHtml(type) {
-    // 确保数据存在
+function _renderListHtml(type) {
+    // 直接读取 parser 和 theaterData 同步的 theaterData 状态
     const data = PhoneSim_State.theaterData?.[type] || [];
     if (data.length === 0) {
         return '<p class="empty-list">暂无内容</p>';
@@ -201,19 +181,15 @@ function _createListItem(item, type) {
     let actionsHtml = '';
     let dataAttributes = '';
     for (const key in item) {
-        if (typeof item[key] === 'object') {
-            // 对象转义为HTML属性
-            dataAttributes += `data-${key.toLowerCase()}="${JSON.stringify(item[key]).replace(/"/g, '&quot;')}" `;
-        } else if (item[key]) {
-            dataAttributes += `data-${key.toLowerCase()}="${item[key].replace(/"/g, '&quot;')}" `;
-        }
+        const value = typeof item[key] === 'object' ? JSON.stringify(item[key]).replace(/"/g, '&quot;') : item[key];
+        dataAttributes += `data-${key.toLowerCase()}="${value}" `;
     }
     switch (type) {
         case 'announcements':
             metaHtml = `<span class="item-tag">${item.type || '通告'}</span><span>合作演员: ${item.actor || '未知'}</span><span class="item-price">${item.payment || '未知'}</span>`;
             break;
         case 'customizations':
-            metaHtml = `<span class="item-tag">${item.typename || item.typename || '定制'}</span><span>粉丝: ${item.fanid || item.fanid || '匿名'}</span><span class="item-price">酬劳: ${item.payment || '未知'}</span>`;
+            metaHtml = `<span class="item-tag">${item.typename || item.typeName}</span><span>粉丝: ${item.fanid || item.fanId}</span><span class="item-price">酬劳: ${item.payment || '未知'}</span>`;
             actionsHtml = `
                 <div class="item-actions">
                     <button class="action-button reject-btn">忽略</button>
@@ -221,10 +197,6 @@ function _createListItem(item, type) {
                 </div>`;
             break;
         case 'theater':
-        case 'theater_hot':
-        case 'theater_new':
-        case 'theater_recommended':
-        case 'theater_paid':
             metaHtml = `<span class="item-tag">${item.tags || '无'}</span><span>热度: ${item.popularity || '0'}</span><span class="item-price">${item.price || '免费'}</span>`;
             break;
         case 'shop':
@@ -266,9 +238,9 @@ export function showDetailModal(type, itemData) {
             footerHtml = `<button class="action-button reject-btn modal-close">返回</button><button class="action-button accept-btn" id="start-shooting-btn">开始拍摄</button>`;
             break;
         case 'customization':
-            headerHtml = `${itemData.fanid || itemData.fanid} 的定制`;
+            headerHtml = `${itemData.fanid || itemData.fanId} 的定制`;
             bodyHtml = `
-                <div class="detail-section"><h4>定制类型</h4><p>${itemData.typename || itemData.typename || '无'}</p></div>
+                <div class="detail-section"><h4>定制类型</h4><p>${itemData.typename || itemData.typeName || '无'}</p></div>
                 <div class="detail-section"><h4>内容要求</h4><p>${itemData.request || '无'}</p></div>
                 <div class="detail-section"><h4>备注</h4><p>${itemData.notes || '无'}</p></div>`;
             footerHtml = `<button class="action-button reject-btn modal-close">返回</button><button class="action-button accept-btn" id="accept-custom-btn">接取</button>`;
@@ -303,7 +275,17 @@ export function showDetailModal(type, itemData) {
 
 function _renderComments(reviews) {
     if (!reviews) return '<p>暂无评论。</p>';
-    let reviewsArray = Array.isArray(reviews) ? reviews : [];
+    let reviewsArray = [];
+    if (typeof reviews === 'string') {
+        try {
+            reviewsArray = JSON.parse(reviews.replace(/'/g, '"'));
+        } catch (e) {
+            console.error("解析评论失败:", e, reviews);
+            return '<p>评论加载失败。</p>';
+        }
+    } else if (Array.isArray(reviews)) {
+        reviewsArray = reviews;
+    }
     if (reviewsArray.length === 0) return '<p>暂无评论。</p>';
     return reviewsArray.map(r => `
         <div class="comment">
