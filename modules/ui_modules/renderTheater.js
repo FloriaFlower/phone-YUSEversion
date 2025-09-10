@@ -32,27 +32,28 @@ export function renderTheaterView(initialPage = 'announcements') {
     
     // 关键修复：只创建一个主容器
     if (view.length === 0) {
+        // 首次创建时才添加完整结构（含返回按钮）
         view = jQuery_API(`<div id="theaterapp-view" class="view"></div>`);
+        view.append(`
+            <div class="app-header">
+                <button class="app-back-btn back-to-home-btn"><<<i class="fas fa-chevron-left"></</</i></button>
+                <h3>欲色剧场</h3>
+            </div>
+            <div class="app-content-wrapper">
+                <div id="theater-content-area"></div>
+            </div>
+            <div class="theater-footer-nav">
+                <button class="nav-btn" data-page="announcements"><span class="icon">📢</span>通告列表</button>
+                <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
+                <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
+                <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
+            </div>
+        `);
         p.append(view);
+    } else {
+        // 非首次渲染：只清空内容区，保留头部（返回按钮）和底部导航
+        view.find('#theater-content-area').empty();
     }
-    
-    // 每次渲染前清空，避免重复生成
-    view.empty().append(`
-        <div class="app-header">
-            <!-- 修复：将错误的 "</</</i>" 改为 "</</i>"，正确闭合图标标签 -->
-            <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
-            <h3>欲色剧场</h3>
-        </div>
-        <div class="app-content-wrapper">
-            <div id="theater-content-area"></div>
-        </div>
-        <div class="theater-footer-nav">
-            <button class="nav-btn" data-page="announcements"><span class="icon">📢</span>通告列表</button>
-            <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
-            <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
-            <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
-        </div>
-    `);
     
     // 绑定事件（只绑定一次）
     if (!PhoneSim_State.theaterEventsBound) {
@@ -67,6 +68,7 @@ export function renderTheaterView(initialPage = 'announcements') {
         PhoneSim_State.theaterInit = true;
     }
 }
+
 // 统一事件绑定，避免重复
 function _bindEvents() {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
