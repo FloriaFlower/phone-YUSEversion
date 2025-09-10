@@ -30,30 +30,28 @@ export function renderTheaterView(initialPage = 'announcements') {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let view = p.find('#theaterapp-view');
     
-    // 关键修复：只创建一个主容器
+    // 关键修复：只创建一个主容器（含完整结构）
     if (view.length === 0) {
-        // 首次创建时才添加完整结构（含返回按钮）
         view = jQuery_API(`<div id="theaterapp-view" class="view"></div>`);
-        view.append(`
-            <div class="app-header">
-                <button class="app-back-btn back-to-home-btn"><<<i class="fas fa-chevron-left"></</</i></button>
-                <h3>欲色剧场</h3>
-            </div>
-            <div class="app-content-wrapper">
-                <div id="theater-content-area"></div>
-            </div>
-            <div class="theater-footer-nav">
-                <button class="nav-btn" data-page="announcements"><span class="icon">📢</span>通告列表</button>
-                <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
-                <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
-                <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
-            </div>
-        `);
         p.append(view);
-    } else {
-        // 非首次渲染：只清空内容区，保留头部（返回按钮）和底部导航
-        view.find('#theater-content-area').empty();
     }
+    
+    // 恢复完整渲染（含头部、内容区、底部导航），但确保只执行一次结构创建
+    view.empty().append(`
+        <div class="app-header">
+            <button class="app-back-btn back-to-home-btn"><<<<i class="fas fa-chevron-left"></</</</i></button>
+            <h3>欲色剧场</h3>
+        </div>
+        <div class="app-content-wrapper">
+            <div id="theater-content-area"></div>
+        </div>
+        <div class="theater-footer-nav">
+            <button class="nav-btn" data-page="announcements"><span class="icon">📢</span>通告列表</button>
+            <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
+            <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
+            <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
+        </div>
+    `);
     
     // 绑定事件（只绑定一次）
     if (!PhoneSim_State.theaterEventsBound) {
@@ -61,10 +59,11 @@ export function renderTheaterView(initialPage = 'announcements') {
         PhoneSim_State.theaterEventsBound = true;
     }
     
-    // 初始渲染页面
+    // 核心恢复：无论是否首次加载，都执行初始页面渲染（解决只显示按钮的问题）
+    switchPage(initialPage);
+    updateNav(initialPage);
+    // 移除首次加载限制，确保每次打开剧场都显示初始页面内容
     if (!PhoneSim_State.theaterInit) {
-        switchPage(initialPage);
-        updateNav(initialPage);
         PhoneSim_State.theaterInit = true;
     }
 }
