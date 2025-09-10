@@ -1,6 +1,5 @@
 import { PhoneSim_Config } from '../config.js';
 import { PhoneSim_State } from './state.js';
-
 export const PhoneSim_Parser = {
      _parseContent: function(contentStr) {
         if (typeof contentStr !== 'string' || !contentStr.trim()) return contentStr;
@@ -72,8 +71,7 @@ export const PhoneSim_Parser = {
         }
         return params;
     },
-    // 暴露此方法供theaterData解析样板数据
-    parseListItems: function(htmlString) {
+    _parseListItems: function(htmlString) {
         if (!htmlString || typeof htmlString !== 'string') return [];
         const items = [];
         const tempDiv = document.createElement('div');
@@ -81,21 +79,6 @@ export const PhoneSim_Parser = {
         const listItems = tempDiv.querySelectorAll('.list-item');
         listItems.forEach(itemNode => {
             const itemData = { ...itemNode.dataset };
-            // 解析reviews/comments等JSON字符串
-            if (itemData.reviews) {
-                try {
-                    itemData.reviews = JSON.parse(itemData.reviews.replace(/'/g, '"'));
-                } catch (e) {
-                    itemData.reviews = [];
-                }
-            }
-            if (itemData.comments) {
-                try {
-                    itemData.comments = JSON.parse(itemData.comments.replace(/'/g, '"'));
-                } catch (e) {
-                    itemData.comments = [];
-                }
-            }
             items.push(itemData);
         });
         return items;
@@ -118,16 +101,16 @@ export const PhoneSim_Parser = {
             shopHtml
         ] = match;
         const data = {
-            announcements: this.parseListItems(announcementsHtml),
-            customizations: this.parseListItems(customizationsHtml),
-            theater: this.parseListItems(theaterHtml),
-            theater_hot: this.parseListItems(theaterHotHtml),
-            theater_new: this.parseListItems(theaterNewHtml),
-            theater_recommended: this.parseListItems(theaterRecommendedHtml),
-            theater_paid: this.parseListItems(theaterPaidHtml),
-            shop: this.parseListItems(shopHtml)
+            announcements: this._parseListItems(announcementsHtml),
+            customizations: this._parseListItems(customizationsHtml),
+            theater: this._parseListItems(theaterHtml),
+            theater_hot: this._parseListItems(theaterHotHtml),
+            theater_new: this._parseListItems(theaterNewHtml),
+            theater_recommended: this._parseListItems(theaterRecommendedHtml),
+            theater_paid: this._parseListItems(theaterPaidHtml),
+            shop: this._parseListItems(shopHtml)
         };
-        // 同步到全局状态，确保render能获取到
+        // 新增：将解析后的数据同步到全局状态，供APP渲染使用
         PhoneSim_State.theaterData = data;
         return {
             commandType: 'TheaterUpdate',
