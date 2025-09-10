@@ -75,7 +75,7 @@ export function addEventListeners() {
     });
 
     p.on('click.phonesim', '.app-block', function() { PhoneSim_Sounds.play('open'); const viewId = jQuery_API(this).data('view'); const rect = this.getBoundingClientRect(); const panelRect = p[0].getBoundingClientRect(); const originX = rect.left - panelRect.left + rect.width / 2; const originY = rect.top - panelRect.top + rect.height / 2; UI.showView(viewId, { animationOrigin: { x: originX, y: originY } }); });
-    p.on('click.phonesim', '.back-to-home-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('HomeScreen'); });
+    p.on('click.phonesim', '.back-to-home-btn', () => { PhoneSim_Sou nds.play('tap');  UI.showView('HomeScreen'); });
     p.on('click.phonesim', '#emaildetail-view .back-to-email-list-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('EmailApp'); });
     p.on('click.phonesim', '.back-to-board-list-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ForumApp'); });
     p.on('click.phonesim', '.back-to-post-list-btn', () => { PhoneSim_Sounds.play('tap'); UI.showView('ForumPostList', PhoneSim_State.activeForumBoardId); });
@@ -145,19 +145,17 @@ export function addEventListeners() {
     p.on('click.phonesim', '.modal-cancel-btn', function() { PhoneSim_Sounds.play('tap'); jQuery_API(this).closest('.phone-sim-live-modal-backdrop').hide(); });
 
     // --- [NEW] YUSE THEATER APP ---
-    // Handles navigation for the bottom bar in the Theater App
-    p.on('click.phonesim', '#theaterapp-view .theater-footer-nav .nav-btn', function() {
-        const btn = jQuery_API(this);
-        if (btn.hasClass('active')) return;
-        PhoneSim_Sounds.play('tap');
-        const pageName = btn.data('page');
-        UI.TheaterRenderer.switchPage(pageName);
-        UI.TheaterRenderer.updateNav(pageName);
-    });
+    p.off('click.phonesim-theater-nav').on('click.phonesim-theater-nav', '#theaterapp-view .theater-footer-nav .nav-btn', function() {
+     const btn = jQuery_API(this);
+     if (btn.hasClass('active')) return;
+     PhoneSim_Sounds.play('tap');
+     const pageName = btn.data('page');
+     UI.TheaterRenderer.switchPage(pageName);
+     UI.TheaterRenderer.updateNav(pageName);
+ });
 
-    // Delegated event handler for the dynamic content area of the Theater App
-    p.on('click.phonesim', '#theater-content-area', async function(e) {
-        const target = jQuery_API(e.target);
+    p.off('click.phonesim-theater-content').on('click.phonesim-theater-content', '#theater-content-area', async function(e) {
+     const target = jQuery_API(e.target);
 
         // Handle independent refresh buttons
         const refreshBtn = target.closest('.theater-refresh-btn');
@@ -221,7 +219,7 @@ export function addEventListeners() {
     });
 
     // Delegated event handler for the theater modal
-    p.on('click.phonesim', '#theater-modal', async function(e){
+    p.off('click.phonesim-theater-modal').on('click.phonesim-theater-modal', '#theater-modal', async function(e){
         const target = jQuery_API(e.target);
         const modal = jQuery_API(this);
 
