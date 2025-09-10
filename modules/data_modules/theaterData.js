@@ -1,5 +1,6 @@
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
+import { PhoneSim_Parser } from './parser.js';
 
 let UI, DataHandler;
 
@@ -351,34 +352,44 @@ const DEFAULT_THEATER_DATA = {
 </div>`,
 };
 
+
 export async function fetchAllTheaterData() {
     try {
         const theaterDb = await DataHandler._fetchFromWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE);
-
-        // 逻辑强化：只有当数据库里真的有内容时才加载
         if (theaterDb && Object.keys(theaterDb).length > 0 && theaterDb.announcements) {
+            // 数据库数据已解析过，直接赋值
             PhoneSim_State.yuseTheaterData = theaterDb;
+            PhoneSim_State.theaterData = theaterDb;
         } else {
-            // 否则，坚定地使用我们的样板数据
+            // 解析DEFAULT_THEATER_DATA的HTML字符串为对象数组
+            const parsedData = {
+                announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
+                customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
+                theater: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater),
+                theater_hot: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_hot),
+                theater_new: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_new),
+                theater_recommended: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
+                theater_paid: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_paid),
+                shop: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.shop)
+            };
             PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
+            // 赋值给全局状态，供render使用
+            PhoneSim_State.theaterData = parsedData;
         }
     } catch (e) {
         console.error('[Phone Sim] Error fetching Yuse Theater data. Falling back to default data.', e);
-        PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA; // 出错时也使用样板数据
-    }
-}
-
-export async function saveTheaterData(data, msgId) {
-    await DataHandler._updateWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE, () => {
-        return {
-            sourceMsgId: msgId,
-            timestamp: new Date().toISOString(),
-            ...data
+        // 出错时也解析样板数据
+        const parsedData = {
+            announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
+            customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
+            theater: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater),
+            theater_hot: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_hot),
+            theater_new: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_new),
+            theater_recommended: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_recommended),
+            theater_paid: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.theater_paid),
+            shop: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.shop)
         };
-    });
-    // 保存后，强制刷新数据和UI
-    await fetchAllTheaterData();
-    if (PhoneSim_State.currentView === 'theaterapp') {
-        UI.renderTheaterView();
+        PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
+        PhoneSim_State.theaterData = parsedData;
     }
 }
