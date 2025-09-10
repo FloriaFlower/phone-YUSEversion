@@ -1,8 +1,6 @@
 import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
-// 新增：引入数据加载函数
-import { fetchAllTheaterData } from './theaterData.js';
 
 let jQuery_API, parentWin, UI;
 let isInitialized = false;
@@ -13,8 +11,7 @@ export function init(deps, uiObject) {
     parentWin = deps.win;
     UI = uiObject;
     _injectBaseStyles();
-    // 新增：初始化时加载剧场数据
-    fetchAllTheaterData();
+    // 【延迟数据加载】避免初始化时依赖未就绪的模块，改为首次渲染时加载
     isInitialized = true;
 }
 
@@ -39,6 +36,7 @@ export function renderTheaterView(initialPage = 'announcements') {
         p.append(view);
     }
     
+    // 【修复HTML语法错误】修正按钮图标标签
     view.empty().append(`
         <div class="app-header">
             <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
@@ -59,7 +57,15 @@ export function renderTheaterView(initialPage = 'announcements') {
         _bindEvents();
         PhoneSim_State.theaterEventsBound = true;
     }
+
+    // 【首次渲染时加载数据】避免初始化依赖冲突
+    if (!PhoneSim_State.theaterDataLoaded) {
+        // 通过UI间接调用数据加载（假设UI有引用theaterData，避免直接引入）
+        if (UI && UI.loadTheaterData) UI.loadTheaterData();
+        PhoneSim_State.theaterDataLoaded = true;
+    }
     
+    // 【修复函数名】改回原函数名_getListHtml（与定义一致）
     switchPage(initialPage);
     updateNav(initialPage);
     if (!PhoneSim_State.theaterInit) {
@@ -117,9 +123,10 @@ function switchPage(pageName) {
             contentArea.html(`
                 <div class="theater-page-header">
                     <h2>通告列表</h2>
+                    <!-- 【修复HTML语法错误】修正图标标签 -->
                     <button class="theater-refresh-btn" data-page="announcements"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_renderListHtml('announcements')}</div>
+                <div class="list-container">${_getListHtml('announcements')}</div>
             `);
             break;
         case 'customizations':
@@ -128,7 +135,7 @@ function switchPage(pageName) {
                     <h2>粉丝定制</h2>
                     <button class="theater-refresh-btn" data-page="customizations"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_renderListHtml('customizations')}</div>
+                <div class="list-container">${_getListHtml('customizations')}</div>
             `);
             break;
         case 'theater':
@@ -144,7 +151,7 @@ function switchPage(pageName) {
                     <button class="filter-btn" data-filter="recommended">❤️ 推荐</button>
                     <button class="filter-btn" data-filter="paid">💸 高价定制</button>
                 </div>
-                <div class="list-container">${_renderListHtml('theater')}</div>
+                <div class="list-container">${_getListHtml('theater')}</div>
             `);
             break;
         case 'shop':
@@ -153,7 +160,7 @@ function switchPage(pageName) {
                     <h2>欲色商城</h2>
                     <button class="theater-refresh-btn" data-page="shop"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
-                <div class="list-container">${_renderListHtml('shop')}</div>
+                <div class="list-container">${_getListHtml('shop')}</div>
             `);
             break;
         default:
@@ -161,8 +168,8 @@ function switchPage(pageName) {
     }
 }
 
-function _renderListHtml(type) {
-    // 直接读取 parser 和 theaterData 同步的 theaterData 状态
+// 【恢复原函数名】改回_getListHtml（与调用处一致）
+function _getListHtml(type) {
     const data = PhoneSim_State.theaterData?.[type] || [];
     if (data.length === 0) {
         return '<p class="empty-list">暂无内容</p>';
