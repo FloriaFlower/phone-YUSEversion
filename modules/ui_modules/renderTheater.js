@@ -42,7 +42,7 @@ export function renderTheaterView(initialPage = 'announcements') {
     // 恢复完整渲染（含头部、内容区、底部导航），但确保只执行一次结构创建
     view.empty().append(`
         <div class="app-header">
-            <button class="app-back-btn back-to-home-btn"></button>
+            <button class="app-back-btn back-to-home-btn"><i class="fas fa-chevron-left"></i></button>
             <h3>欲色剧场</h3>
         </div>
         <div class="app-content-wrapper">
