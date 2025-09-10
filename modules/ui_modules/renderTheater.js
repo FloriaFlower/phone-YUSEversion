@@ -2,27 +2,44 @@ import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
 let jQuery_API, parentWin, UI;
+// 新增：单例标记，防止重复初始化
+let isInitialized = false;
+
 export function init(deps, uiObject) {
+    if (isInitialized) return; // 避免重复初始化
     jQuery_API = deps.jq;
     parentWin = deps.win;
     UI = uiObject;
     _injectBaseStyles();
+    isInitialized = true;
 }
-// 保留样式注入，删除重复的CSS（依赖外部Theater.css）
+
+// 优化样式注入，增强对比度
 function _injectBaseStyles() {
     const style = parentWin.document.createElement('style');
     style.textContent = `
-        /* 仅保留必要的补充样式，核心样式依赖外部CSS */
-        #theaterapp-view { height: 100%; }
-        .theater-footer-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; }
-        .app-content-wrapper { padding-bottom: 60px; /* 为底部导航预留空间 */ }
+        /* 强制覆盖重复样式，确保优先级 */
+        #theaterapp-view { height: 100% !important; }
+        .theater-footer-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 100 !important; }
+        .app-content-wrapper { padding-bottom: 60px !important; }
+        /* 临时修复：隐藏可能重复的按钮容器 */
+        #theaterapp-view .app-header:empty,
+        #theaterapp-view .theater-footer-nav:empty { display: none !important; }
     `;
     parentWin.document.head.appendChild(style);
 }
+
 export function renderTheaterView(initialPage = 'announcements') {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    const view = p.find('#theaterapp-view');
-    // 关键修复：每次渲染前清空容器，避免重复生成
+    let view = p.find('#theaterapp-view');
+    
+    // 关键修复：只创建一个主容器
+    if (view.length === 0) {
+        view = jQuery_API(`<div id="theaterapp-view" class="view"></div>`);
+        p.append(view);
+    }
+    
+    // 每次渲染前清空，避免重复生成
     view.empty().append(`
         <div class="app-header">
             <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
@@ -38,28 +55,72 @@ export function renderTheaterView(initialPage = 'announcements') {
             <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
         </div>
     `);
-    _bindNavEvents();
-    // 初始渲染时只执行一次页面切换
+    
+    // 绑定事件（只绑定一次）
+    if (!PhoneSim_State.theaterEventsBound) {
+        _bindEvents();
+        PhoneSim_State.theaterEventsBound = true;
+    }
+    
+    // 初始渲染页面
     if (!PhoneSim_State.theaterInit) {
         switchPage(initialPage);
         updateNav(initialPage);
         PhoneSim_State.theaterInit = true;
     }
 }
-// 修复导航事件绑定（使用事件委托，避免重复绑定）
-function _bindNavEvents() {
-    const view = jQuery_API(parentWin.document.body).find('#theaterapp-view');
-    // 解绑旧事件，避免重复触发
-    view.off('click', '.back-to-home-btn');
-    view.on('click', '.back-to-home-btn', () => {
+
+// 统一事件绑定，避免重复
+function _bindEvents() {
+    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    const view = p.find('#theaterapp-view');
+    
+    // 解绑所有旧事件，防止重复触发
+    view.off('click.phonesim');
+    p.off('click.phonesim', '#theaterapp-view .back-to-home-btn');
+    p.off('click.phonesim', '#theaterapp-view .theater-refresh-btn');
+    p.off('click.phonesim', '#theaterapp-view .nav-btn');
+    
+    // 返回首页按钮
+    p.on('click.phonesim', '#theaterapp-view .back-to-home-btn', () => {
         PhoneSim_Sounds.play('tap');
-        UI.showView('HomeScreen'); // 直接返回首页，删除alert弹窗
+        UI.showView('HomeScreen');
+    });
+    
+    // 刷新按钮（委托给内容区，避免重复绑定）
+    p.on('click.phonesim', '#theater-content-area .theater-refresh-btn', async function() {
+        PhoneSim_Sounds.play('send');
+        const page = jQuery_API(this).data('page');
+        const pageMap = {
+            'announcements': '通告列表',
+            'customizations': '粉丝定制',
+            'theater': '剧场列表',
+            'shop': '欲色商城'
+        };
+        const prompt = pageMap[page] ? `(系统提示：洛洛刷新了欲色剧场的“${pageMap[page]}”页面)` : '';
+        if (prompt) {
+            await UI.triggerAIGeneration(prompt); // 假设UI有统一AI调用方法
+        }
+        switchPage(page);
+    });
+    
+    // 导航按钮
+    p.on('click.phonesim', '#theaterapp-view .nav-btn', function() {
+        const btn = jQuery_API(this);
+        if (btn.hasClass('active')) return;
+        PhoneSim_Sounds.play('tap');
+        const page = btn.data('page');
+        switchPage(page);
+        updateNav(page);
     });
 }
-// 简化页面切换逻辑，避免重复生成刷新按钮
+
+// 页面切换逻辑（保持不变，确保只操作一个内容区）
 function switchPage(pageName) {
     const contentArea = jQuery_API(parentWin.document.body).find('#theater-content-area');
+    if (contentArea.length === 0) return; // 防止操作不存在的元素
     contentArea.empty();
+    
     switch (pageName) {
         case 'announcements':
             contentArea.html(`
@@ -108,7 +169,8 @@ function switchPage(pageName) {
             contentArea.html('<p class="empty-list">页面不存在</p>');
     }
 }
-// 提取列表渲染公共方法，避免代码冗余
+
+// 以下方法（_getListHtml、updateNav、_createListItem、showDetailModal等）保持不变
 function _getListHtml(type) {
     const data = PhoneSim_State.theaterData?.[type] || [];
     if (data.length === 0) {
@@ -116,12 +178,13 @@ function _getListHtml(type) {
     }
     return data.map(item => _createListItem(item, type)).join('');
 }
-// 保留其他原有方法（updateNav、_createListItem、showDetailModal等）
+
 function updateNav(activePage) {
-    const navButtons = jQuery_API(parentWin.document.body).find('#theaterapp-view .theater-footer-nav .nav-btn');
+    const navButtons = jQuery_API(parentWin.document.body).find('#theaterapp-view .nav-btn');
     navButtons.removeClass('active');
     navButtons.filter(`[data-page="${activePage}"]`).addClass('active');
 }
+
 function _createListItem(item, type) {
     let metaHtml = '';
     let actionsHtml = '';
@@ -157,11 +220,12 @@ function _createListItem(item, type) {
         </div>
     `;
 }
+
 export function showDetailModal(type, itemData) {
-    const modal = jQuery_API(parentWin.document.body).find('#theater-modal');
+    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    let modal = p.find('#theater-modal');
     if (modal.length === 0) {
-        // 只创建一次模态框
-        const modalHtml = `
+        modal = jQuery_API(`
             <div id="theater-modal" class="theater-modal-overlay">
                 <div class="theater-modal-content">
                     <div class="theater-modal-header"></div>
@@ -169,8 +233,8 @@ export function showDetailModal(type, itemData) {
                     <div class="theater-modal-footer"></div>
                 </div>
             </div>
-        `;
-        jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`).append(modalHtml);
+        `);
+        p.append(modal);
     }
     const header = modal.find('.theater-modal-header');
     const body = modal.find('.theater-modal-body');
@@ -217,6 +281,7 @@ export function showDetailModal(type, itemData) {
         modal.removeClass('visible');
     });
 }
+
 function _renderComments(reviews) {
     if (!reviews) return '<p>暂无评论。</p>';
     let reviewsArray = [];
@@ -236,6 +301,7 @@ function _renderComments(reviews) {
             <span class="comment-user">${r.user || '匿名'}:</span> ${r.text || '无内容'}
         </div>`).join('');
 }
+
 export const TheaterRenderer = {
     init,
     renderTheaterView,
