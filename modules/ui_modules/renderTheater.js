@@ -6,44 +6,174 @@ export function init(deps, uiObject) {
     jQuery_API = deps.jq;
     parentWin = deps.win;
     UI = uiObject;
-    // 新增：初始化APP样式（注入基础CSS）
     _injectBaseStyles();
 }
-// 新增：注入基础样式
 function _injectBaseStyles() {
+    // 移除旧样式，避免冲突
+    const oldStyle = parentWin.document.querySelector('#theaterapp-base-style');
+    if (oldStyle) oldStyle.remove();
+    
     const style = parentWin.document.createElement('style');
+    style.id = 'theaterapp-base-style';
     style.textContent = `
-        #theaterapp-view { display: flex; flex-direction: column; height: 100%; }
-        .app-header { padding: 12px 16px; background: #f5f5f5; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; }
-        .app-back-btn { background: none; border: none; font-size: 18px; cursor: pointer; }
-        .app-content-wrapper { flex: 1; overflow-y: auto; padding: 16px; background: #fff; }
-        #theater-content-area { width: 100%; }
-        .theater-footer-nav { display: flex; border-top: 1px solid #eee; }
-        .nav-btn { flex: 1; padding: 12px 0; border: none; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .nav-btn.active { color: #007aff; }
-        .theater-page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .theater-refresh-btn { background: none; border: none; cursor: pointer; font-size: 16px; }
-        .list-container { display: flex; flex-direction: column; gap: 12px; }
-        .list-item { padding: 12px; border: 1px solid #eee; border-radius: 8px; }
-        .item-title { font-weight: bold; margin-bottom: 8px; }
-        .item-meta { font-size: 12px; color: #666; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-        .item-tag { padding: 2px 6px; background: #f0f0f0; border-radius: 4px; }
-        .item-price { color: #ff4400; }
-        .item-actions { display: flex; gap: 8px; margin-top: 8px; }
-        .action-button { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
-        .accept-btn { background: #007aff; color: white; }
-        .reject-btn { background: #f0f0f0; }
-        .empty-list { text-align: center; color: #999; padding: 20px 0; }
-        .theater-filters { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 8px; }
-        .filter-btn { padding: 6px 12px; border: 1px solid #eee; border-radius: 16px; background: white; cursor: pointer; white-space: nowrap; }
-        .filter-btn.active { background: #007aff; color: white; border-color: #007aff; }
+        /* 确保APP容器独立，不受外部影响 */
+        #theaterapp-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            background-color: #fafafa;
+        }
+        /* 头部固定 */
+        .app-header {
+            padding: 12px 16px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0; /* 不被压缩 */
+        }
+        .app-back-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #000;
+        }
+        /* 内容区滚动 */
+        .app-content-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: #fafafa;
+        }
+        #theater-content-area {
+            width: 100%;
+        }
+        /* 底部导航固定 */
+        .theater-footer-nav {
+            display: flex;
+            border-top: 1px solid #eee;
+            background: #fff;
+            flex-shrink: 0; /* 固定在底部 */
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 12px 0;
+            border: none;
+            background: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .nav-btn.active {
+            color: #007aff;
+        }
+        /* 页面头部 */
+        .theater-page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .theater-refresh-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+        }
+        /* 列表样式 */
+        .list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .list-item {
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .item-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .item-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .item-tag {
+            padding: 2px 6px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        .item-price {
+            color: #ff4400;
+        }
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            justify-content: flex-end;
+        }
+        .action-button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .accept-btn {
+            background: #007aff;
+            color: white;
+        }
+        .reject-btn {
+            background: #f0f0f0;
+        }
+        .empty-list {
+            text-align: center;
+            color: #999;
+            padding: 40px 0;
+        }
+        /* 筛选器 */
+        .theater-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+        .filter-btn {
+            padding: 6px 12px;
+            border: 1px solid #eee;
+            border-radius: 16px;
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .filter-btn.active {
+            background: #007aff;
+            color: white;
+            border-color: #007aff;
+        }
     `;
     parentWin.document.head.appendChild(style);
 }
 export function renderTheaterView(initialPage = 'announcements') {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     const view = p.find('#theaterapp-view');
-    // 修复：无论是否有contentWrapper，都强制构建正确结构
+    // 清空旧内容，重建唯一结构
     view.empty().append(`
         <div class="app-header">
             <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
@@ -59,30 +189,36 @@ export function renderTheaterView(initialPage = 'announcements') {
             <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
         </div>
     `);
-    // 修复：绑定导航按钮点击事件
-    _bindNavEvents();
-    // 渲染初始页面
+    // 绑定唯一事件（避免重复绑定）
+    _bindUniqueEvents();
+    // 初始渲染
     switchPage(initialPage);
     updateNav(initialPage);
 }
-// 新增：绑定导航按钮事件
-function _bindNavEvents() {
-    const navButtons = jQuery_API(parentWin.document.body).find('#theaterapp-view .theater-footer-nav .nav-btn');
-    navButtons.on('click', function() {
-        const pageName = jQuery_API(this).data('page');
+// 新增：绑定唯一事件（防止重复绑定导致多按钮问题）
+function _bindUniqueEvents() {
+    const view = jQuery_API(parentWin.document.body).find('#theaterapp-view');
+    const backBtn = view.find('.back-to-home-btn');
+    const navButtons = view.find('.theater-footer-nav .nav-btn');
+    
+    // 解绑旧事件，避免重复
+    backBtn.off('click.phonesim-theater');
+    navButtons.off('click.phonesim-theater');
+    
+    // 绑定返回首页事件（无弹窗）
+    backBtn.on('click.phonesim-theater', () => {
+        PhoneSim_Sounds.play('tap');
+        UI.showView('HomeScreen'); // 直接返回，不弹确认框
+    });
+    
+    // 绑定导航事件
+    navButtons.on('click.phonesim-theater', function() {
+        const btn = jQuery_API(this);
+        if (btn.hasClass('active')) return;
+        PhoneSim_Sounds.play('tap');
+        const pageName = btn.data('page');
         switchPage(pageName);
         updateNav(pageName);
-    });
-    // 返回按钮事件
-    const backBtn = jQuery_API(parentWin.document.body).find('.back-to-home-btn');
-    backBtn.on('click', function() {
-        // 此处可添加返回首页逻辑
-        alert('返回首页');
-    });
-    // 刷新按钮事件
-    jQuery_API(parentWin.document.body).on('click', '.theater-refresh-btn', function() {
-        const pageName = jQuery_API(this).data('page');
-        switchPage(pageName);
     });
 }
 function switchPage(pageName) {
@@ -110,11 +246,12 @@ function updateNav(activePage) {
     navButtons.removeClass('active');
     navButtons.filter(`[data-page="${activePage}"]`).addClass('active');
 }
+// 子页面渲染函数（保持不变，移除重复的刷新按钮逻辑）
 function _renderAnnouncementsPage(container) {
     const headerHtml = `
         <div class="theater-page-header">
             <h2>通告列表</h2>
-            <button class="theater-refresh-btn" data-page="announcements" title="刷新通告"><<i class="fas fa-sync-alt"></</i></button>
+            <button class="theater-refresh-btn" data-page="announcements"><<i class="fas fa-sync-alt"></</i></button>
         </div>
     `;
     const announcements = PhoneSim_State.theaterData?.announcements || [];
@@ -127,7 +264,7 @@ function _renderCustomizationsPage(container) {
     const headerHtml = `
         <div class="theater-page-header">
             <h2>粉丝定制</h2>
-            <button class="theater-refresh-btn" data-page="customizations" title="刷新定制"><<i class="fas fa-sync-alt"></</i></button>
+            <button class="theater-refresh-btn" data-page="customizations"><<i class="fas fa-sync-alt"></</i></button>
         </div>
     `;
     const customizations = PhoneSim_State.theaterData?.customizations || [];
@@ -140,7 +277,7 @@ function _renderTheaterPage(container, filter = 'all') {
     const headerHtml = `
         <div class="theater-page-header">
             <h2>剧场列表</h2>
-            <button class="theater-refresh-btn" data-page="theater" title="刷新剧场"><<i class="fas fa-sync-alt"></</i></button>
+            <button class="theater-refresh-btn" data-page="theater"><<i class="fas fa-sync-alt"></</i></button>
         </div>
     `;
     const filtersHtml = `
@@ -164,8 +301,8 @@ function _renderTheaterPage(container, filter = 'all') {
         ? itemsToShow.map(item => _createListItem(item, 'theater')).join('')
         : '<p class="empty-list">该分类下还没有作品。</p>';
     container.html(headerHtml + filtersHtml + `<div class="list-container" id="theater-list-container">${listHtml}</div>`);
-    // 绑定筛选按钮事件
-    container.find('.filter-btn').on('click', function() {
+    // 绑定筛选事件（唯一绑定）
+    container.find('.filter-btn').off('click.phonesim-theater').on('click.phonesim-theater', function() {
         const newFilter = jQuery_API(this).data('filter');
         _renderTheaterPage(container, newFilter);
     });
@@ -174,7 +311,7 @@ function _renderShopPage(container) {
     const headerHtml = `
         <div class="theater-page-header">
             <h2>欲色商城</h2>
-            <button class="theater-refresh-btn" data-page="shop" title="刷新商城"><<i class="fas fa-sync-alt"></</i></button>
+            <button class="theater-refresh-btn" data-page="shop"><<i class="fas fa-sync-alt"></</i></button>
         </div>
     `;
     const shopItems = PhoneSim_State.theaterData?.shop || [];
@@ -219,7 +356,21 @@ function _createListItem(item, type) {
     `;
 }
 export function showDetailModal(type, itemData) {
-    const modal = jQuery_API(parentWin.document.body).find('#theater-modal');
+    const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
+    // 确保模态框唯一
+    let modal = p.find('#theater-modal');
+    if (modal.length === 0) {
+        modal = jQuery_API(`
+            <div id="theater-modal" class="theater-modal-overlay">
+                <div class="theater-modal-content">
+                    <div class="theater-modal-header"></div>
+                    <div class="theater-modal-body"></div>
+                    <div class="theater-modal-footer"></div>
+                </div>
+            </div>
+        `);
+        p.append(modal);
+    }
     const header = modal.find('.theater-modal-header');
     const body = modal.find('.theater-modal-body');
     const footer = modal.find('.theater-modal-footer');
@@ -261,8 +412,8 @@ export function showDetailModal(type, itemData) {
     body.html(bodyHtml);
     footer.html(footerHtml);
     modal.addClass('visible');
-    // 绑定模态框关闭事件
-    modal.find('.modal-close').on('click', function() {
+    // 绑定模态框事件（唯一绑定）
+    modal.find('.modal-close').off('click.phonesim-theater').on('click.phonesim-theater', function() {
         modal.removeClass('visible');
     });
 }
