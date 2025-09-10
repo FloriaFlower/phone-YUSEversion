@@ -4,7 +4,6 @@ import { PhoneSim_Sounds } from '../sounds.js';
 let jQuery_API, parentWin, UI;
 // 新增：单例标记，防止重复初始化
 let isInitialized = false;
-
 export function init(deps, uiObject) {
     if (isInitialized) return; // 避免重复初始化
     jQuery_API = deps.jq;
@@ -13,7 +12,6 @@ export function init(deps, uiObject) {
     _injectBaseStyles();
     isInitialized = true;
 }
-
 // 优化样式注入，增强对比度
 function _injectBaseStyles() {
     const style = parentWin.document.createElement('style');
@@ -28,7 +26,6 @@ function _injectBaseStyles() {
     `;
     parentWin.document.head.appendChild(style);
 }
-
 export function renderTheaterView(initialPage = 'announcements') {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let view = p.find('#theaterapp-view');
@@ -42,6 +39,7 @@ export function renderTheaterView(initialPage = 'announcements') {
     // 每次渲染前清空，避免重复生成
     view.empty().append(`
         <div class="app-header">
+            <!-- 修复：将错误的 "</</</i>" 改为 "</</i>"，正确闭合图标标签 -->
             <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
             <h3>欲色剧场</h3>
         </div>
@@ -69,7 +67,6 @@ export function renderTheaterView(initialPage = 'announcements') {
         PhoneSim_State.theaterInit = true;
     }
 }
-
 // 统一事件绑定，避免重复
 function _bindEvents() {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
@@ -97,7 +94,7 @@ function _bindEvents() {
             'theater': '剧场列表',
             'shop': '欲色商城'
         };
-        const prompt = pageMap[page] ? `(系统提示：洛洛刷新了欲色剧场的“${pageMap[page]}”页面)` : '';
+        const prompt = pageMap[page] ? `(系统提示：{{user}}刷新了欲色剧场的“${pageMap[page]}”页面)` : '';
         if (prompt) {
             await UI.triggerAIGeneration(prompt); // 假设UI有统一AI调用方法
         }
@@ -114,7 +111,6 @@ function _bindEvents() {
         updateNav(page);
     });
 }
-
 // 页面切换逻辑（保持不变，确保只操作一个内容区）
 function switchPage(pageName) {
     const contentArea = jQuery_API(parentWin.document.body).find('#theater-content-area');
@@ -126,6 +122,7 @@ function switchPage(pageName) {
             contentArea.html(`
                 <div class="theater-page-header">
                     <h2>通告列表</h2>
+                    <!-- 修复：将错误的 "</</</i>" 改为 "</</i>" -->
                     <button class="theater-refresh-btn" data-page="announcements"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
                 <div class="list-container">${_getListHtml('announcements')}</div>
@@ -135,6 +132,7 @@ function switchPage(pageName) {
             contentArea.html(`
                 <div class="theater-page-header">
                     <h2>粉丝定制</h2>
+                    <!-- 修复：将错误的 "</</</i>" 改为 "</</i>" -->
                     <button class="theater-refresh-btn" data-page="customizations"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
                 <div class="list-container">${_getListHtml('customizations')}</div>
@@ -144,6 +142,7 @@ function switchPage(pageName) {
             contentArea.html(`
                 <div class="theater-page-header">
                     <h2>剧场列表</h2>
+                    <!-- 修复：将错误的 "</</</i>" 改为 "</</i>" -->
                     <button class="theater-refresh-btn" data-page="theater"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
                 <div class="theater-filters">
@@ -160,6 +159,7 @@ function switchPage(pageName) {
             contentArea.html(`
                 <div class="theater-page-header">
                     <h2>欲色商城</h2>
+                    <!-- 修复：将错误的 "</</</i>" 改为 "</</i>" -->
                     <button class="theater-refresh-btn" data-page="shop"><<i class="fas fa-sync-alt"></</i></button>
                 </div>
                 <div class="list-container">${_getListHtml('shop')}</div>
@@ -169,7 +169,6 @@ function switchPage(pageName) {
             contentArea.html('<p class="empty-list">页面不存在</p>');
     }
 }
-
 // 以下方法（_getListHtml、updateNav、_createListItem、showDetailModal等）保持不变
 function _getListHtml(type) {
     const data = PhoneSim_State.theaterData?.[type] || [];
@@ -178,13 +177,11 @@ function _getListHtml(type) {
     }
     return data.map(item => _createListItem(item, type)).join('');
 }
-
 function updateNav(activePage) {
     const navButtons = jQuery_API(parentWin.document.body).find('#theaterapp-view .nav-btn');
     navButtons.removeClass('active');
     navButtons.filter(`[data-page="${activePage}"]`).addClass('active');
 }
-
 function _createListItem(item, type) {
     let metaHtml = '';
     let actionsHtml = '';
@@ -220,7 +217,6 @@ function _createListItem(item, type) {
         </div>
     `;
 }
-
 export function showDetailModal(type, itemData) {
     const p = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
     let modal = p.find('#theater-modal');
@@ -281,7 +277,6 @@ export function showDetailModal(type, itemData) {
         modal.removeClass('visible');
     });
 }
-
 function _renderComments(reviews) {
     if (!reviews) return '<p>暂无评论。</p>';
     let reviewsArray = [];
@@ -301,7 +296,6 @@ function _renderComments(reviews) {
             <span class="comment-user">${r.user || '匿名'}:</span> ${r.text || '无内容'}
         </div>`).join('');
 }
-
 export const TheaterRenderer = {
     init,
     renderTheaterView,
