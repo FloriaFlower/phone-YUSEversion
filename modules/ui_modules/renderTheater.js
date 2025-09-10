@@ -2,255 +2,280 @@ import { PhoneSim_Config } from '../../config.js';
 import { PhoneSim_State } from '../state.js';
 import { PhoneSim_Sounds } from '../sounds.js';
 
-let jQuery_API, parentWin, UI;
-let isInitialized = false; // 单例标记
+// 全局变量初始化（避免污染）
+let $, parentWindow, UIModule;
+let isTheaterInitialized = false;
 
-// 初始化依赖（确保只执行一次）
-export function init(deps, uiObject) {
-    if (isInitialized) return;
-    // 验证依赖是否存在，避免后续报错
-    if (!deps?.jq || !deps?.win || !uiObject) {
-        console.error("Theater初始化失败：依赖参数不完整");
+/**
+ * 初始化剧场模块（依赖注入）
+ * @param {Object} deps - 依赖对象（jq: jQuery实例, win: 父窗口）
+ * @param {Object} ui - UI控制模块
+ */
+export function initTheater(deps, ui) {
+    if (isTheaterInitialized) return;
+    // 严格验证依赖，缺失则不初始化
+    if (!deps?.jq || !deps?.win || !ui) {
+        console.error("Theater模块初始化失败：依赖不完整");
         return;
     }
-    jQuery_API = deps.jq;
-    parentWin = deps.win;
-    UI = uiObject;
-    _injectBaseStyles();
-    isInitialized = true;
-    // 初始化状态标记
-    if (PhoneSim_State.theaterEventsBound === undefined) {
-        PhoneSim_State.theaterEventsBound = false;
-    }
-    if (PhoneSim_State.theaterInit === undefined) {
-        PhoneSim_State.theaterInit = false;
-    }
+    $ = deps.jq;
+    parentWindow = deps.win;
+    UIModule = ui;
+    // 初始化状态标记（绑定到模块自身，避免污染全局State）
+    this.theaterEventsBound = false;
+    this.theaterFirstLoad = true;
+    // 注入隔离样式（添加前缀避免冲突）
+    injectIsolatedStyles();
+    isTheaterInitialized = true;
 }
 
-// 注入基础样式
-function _injectBaseStyles() {
-    const style = parentWin.document.createElement('style');
-    style.textContent = `
-        #theaterapp-view { height: 100% !important; }
-        .theater-footer-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 100 !important; }
-        .app-content-wrapper { padding-bottom: 60px !important; }
-        #theaterapp-view .app-header:empty,
+/**
+ * 注入隔离样式（添加theater-前缀，避免影响其他元素）
+ */
+function injectIsolatedStyles() {
+    const styleElement = parentWindow.document.createElement('style');
+    styleElement.id = 'theater-isolated-style';
+    // 样式添加唯一前缀，确保不影响悬浮按钮和模拟器开关
+    styleElement.textContent = `
+        /* 剧场模块样式（带前缀隔离） */
+        #theaterapp-view { height: 100% !important; position: relative; z-index: 10; }
+        .theater-footer-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 15 !important; }
+        .theater-app-content { padding-bottom: 60px !important; }
+        /* 空容器隐藏（不影响其他元素） */
+        #theaterapp-view .theater-app-header:empty,
         #theaterapp-view .theater-footer-nav:empty { display: none !important; }
     `;
-    parentWin.document.head.appendChild(style);
+    // 确保样式添加到head顶部，避免被其他样式覆盖
+    parentWindow.document.head.insertBefore(styleElement, parentWindow.document.head.firstChild);
 }
 
-// 渲染剧场主视图
+/**
+ * 渲染剧场主视图
+ * @param {string} initialPage - 初始页面（默认：announcements）
+ */
 export function renderTheaterView(initialPage = 'announcements') {
-    // 未初始化则先执行初始化
-    if (!isInitialized) {
-        console.warn("Theater未初始化，无法渲染视图");
+    if (!isTheaterInitialized) {
+        console.warn("请先调用initTheater初始化模块");
         return;
     }
 
-    const $panel = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    if ($panel.length === 0) {
-        console.error("未找到面板容器：" + PhoneSim_Config.PANEL_ID);
+    // 1. 精准查找面板容器（避免影响其他元素）
+    const $panelContainer = $(parentWindow.document.getElementById(PhoneSim_Config.PANEL_ID));
+    if ($panelContainer.length === 0) {
+        console.error("未找到面板容器，ID：" + PhoneSim_Config.PANEL_ID);
         return;
     }
 
-    // 只创建一个主容器
-    let $view = $panel.find('#theaterapp-view');
-    if ($view.length === 0) {
-        $view = jQuery_API(`<div id="theaterapp-view" class="view"></div>`);
-        $panel.append($view);
+    // 2. 只创建一个剧场容器（避免重复）
+    let $theaterView = $panelContainer.find('#theaterapp-view');
+    if ($theaterView.length === 0) {
+        $theaterView = $(`
+            <div id="theaterapp-view" class="view">
+                <!-- 内容将在后续渲染 -->
+            </div>
+        `);
+        $panelContainer.append($theaterView);
     }
 
-    // 清空容器，避免重复
-    $view.empty().append(`
-        <div class="app-header">
-            <button class="app-back-btn back-to-home-btn"><<i class="fas fa-chevron-left"></</i></button>
+    // 3. 渲染视图内容（使用隔离类名）
+    $theaterView.empty().append(`
+        <div class="theater-app-header">
+            <button class="theater-back-btn"><<<i class="fas fa-chevron-left"></</</i></button>
             <h3>欲色剧场</h3>
         </div>
-        <div class="app-content-wrapper">
-            <div id="theater-content-area"></div>
+        <div class="theater-app-content">
+            <div id="theater-content-container"></div>
         </div>
         <div class="theater-footer-nav">
-            <button class="nav-btn" data-page="announcements"><span class="icon">📢</span>通告列表</button>
-            <button class="nav-btn" data-page="customizations"><span class="icon">💖</span>粉丝定制</button>
-            <button class="nav-btn" data-page="theater"><span class="icon">🎬</span>剧场列表</button>
-            <button class="nav-btn" data-page="shop"><span class="icon">🛒</span>欲色商城</button>
+            <button class="theater-nav-btn" data-page="announcements"><span>📢</span>通告</button>
+            <button class="theater-nav-btn" data-page="customizations"><span>💖</span>定制</button>
+            <button class="theater-nav-btn" data-page="theater"><span>🎬</span>剧场</button>
+            <button class="theater-nav-btn" data-page="shop"><span>🛒</span>商城</button>
         </div>
     `);
 
-    // 绑定事件（只绑定一次）
-    if (!PhoneSim_State.theaterEventsBound) {
-        _bindEvents($panel); // 传入面板容器，缩小事件范围
-        PhoneSim_State.theaterEventsBound = true;
+    // 4. 绑定事件（仅一次）
+    if (!this.theaterEventsBound) {
+        bindTheaterEvents($theaterView);
+        this.theaterEventsBound = true;
     }
 
-    // 初始渲染页面
-    if (!PhoneSim_State.theaterInit) {
-        switchPage(initialPage);
-        updateNav(initialPage);
-        PhoneSim_State.theaterInit = true;
+    // 5. 首次加载时渲染初始页面
+    if (this.theaterFirstLoad) {
+        switchTheaterPage(initialPage);
+        updateTheaterNav(initialPage);
+        this.theaterFirstLoad = false;
     }
 }
 
-// 统一事件绑定（修复核心：使用明确的容器，避免事件丢失）
-function _bindEvents($panel) {
-    const $view = $panel.find('#theaterapp-view');
-
-    // 1. 返回首页按钮
-    $view.on('click', '.back-to-home-btn', () => {
+/**
+ * 绑定剧场事件（作用域限定在剧场容器内）
+ * @param {jQuery} $container - 剧场容器
+ */
+function bindTheaterEvents($container) {
+    // 1. 返回按钮
+    $container.on('click', '.theater-back-btn', () => {
         PhoneSim_Sounds.play('tap');
-        UI.showView('HomeScreen');
+        UIModule.showView('HomeScreen');
     });
 
-    // 2. 刷新按钮（委托给内容区）
-    $view.on('click', '#theater-content-area .theater-refresh-btn', async function() {
+    // 2. 导航按钮
+    $container.on('click', '.theater-nav-btn', function() {
+        const $btn = $(this);
+        if ($btn.hasClass('active')) return;
+        PhoneSim_Sounds.play('tap');
+        const targetPage = $btn.data('page');
+        switchTheaterPage(targetPage);
+        updateTheaterNav(targetPage);
+    });
+
+    // 3. 刷新按钮
+    $container.on('click', '.theater-refresh-btn', async function() {
         PhoneSim_Sounds.play('send');
-        const page = jQuery_API(this).data('page');
-        const pageMap = {
+        const targetPage = $(this).data('page');
+        const pageNames = {
             'announcements': '通告列表',
             'customizations': '粉丝定制',
             'theater': '剧场列表',
             'shop': '欲色商城'
         };
-        const prompt = pageMap[page] ? `(系统提示：洛洛刷新了欲色剧场的“${pageMap[page]}”页面)` : '';
-        if (prompt && UI.triggerAIGeneration) {
-            await UI.triggerAIGeneration(prompt);
+        const promptText = pageNames[targetPage] ? `(系统提示：刷新了欲色剧场的“${pageNames[targetPage]}”页面)` : '';
+        if (promptText && UIModule.triggerAIGeneration) {
+            await UIModule.triggerAIGeneration(promptText);
         }
-        switchPage(page);
+        switchTheaterPage(targetPage);
     });
 
-    // 3. 导航按钮
-    $view.on('click', '.nav-btn', function() {
-        const $btn = jQuery_API(this);
-        if ($btn.hasClass('active')) return;
-        PhoneSim_Sounds.play('tap');
-        const page = $btn.data('page');
-        switchPage(page);
-        updateNav(page);
-    });
-
-    // 4. 列表项点击（新增：打开详情）
-    $view.on('click', '.list-item', function() {
-        const $item = jQuery_API(this);
-        const type = $item.data('type');
-        // 提取item数据
-        const itemData = {};
-        $item.data().forEach((value, key) => {
-            if (key !== 'type') itemData[key] = value;
-        });
-        showDetailModal(type, itemData);
+    // 4. 列表项点击（打开详情）
+    $container.on('click', '.theater-list-item', function() {
+        const $item = $(this);
+        const itemType = $item.data('type');
+        const itemData = $item.data();
+        showTheaterDetail(itemType, itemData);
     });
 
     // 5. 列表项操作按钮（忽略/接取）
-    $view.on('click', '.item-actions .action-button', function(e) {
+    $container.on('click', '.theater-action-btn', function(e) {
         e.stopPropagation(); // 阻止触发列表项点击
-        const $btn = jQuery_API(this);
-        const $item = $btn.closest('.list-item');
-        const itemType = $item.data('type');
-        const itemId = $item.data('id') || '未知';
-
-        if ($btn.hasClass('reject-btn')) {
+        const $btn = $(this);
+        const $item = $btn.closest('.theater-list-item');
+        const itemId = $item.data('id') || '未知项';
+        
+        if ($btn.hasClass('reject')) {
             PhoneSim_Sounds.play('tap');
-            alert(`已忽略【${itemType}】项：${itemId}`);
-        } else if ($btn.hasClass('accept-btn')) {
+            alert(`已忽略：${itemId}`);
+        } else if ($btn.hasClass('accept')) {
             PhoneSim_Sounds.play('tap');
-            alert(`已接取【${itemType}】项：${itemId}`);
+            alert(`已接取：${itemId}`);
         }
+    });
+
+    // 6. 模态框关闭按钮
+    $container.on('click', '.theater-modal-close', function() {
+        $(parentWindow.document.getElementById('theater-detail-modal')).removeClass('visible');
+    });
+
+    // 7. 筛选器按钮
+    $container.on('click', '.theater-filter-btn', function() {
+        const $btn = $(this);
+        $btn.siblings().removeClass('active');
+        $btn.addClass('active');
+        // 筛选逻辑可在此添加
     });
 }
 
-// 页面切换逻辑
-export function switchPage(pageName) {
-    const $contentArea = jQuery_API(parentWin.document.body).find('#theater-content-area');
-    if ($contentArea.length === 0) return;
+/**
+ * 切换剧场页面
+ * @param {string} pageName - 页面名称
+ */
+function switchTheaterPage(pageName) {
+    const $contentContainer = $(parentWindow.document.getElementById('theater-content-container'));
+    if ($contentContainer.length === 0) return;
 
-    $contentArea.empty();
+    // 清空内容（避免叠加）
+    $contentContainer.empty();
+
+    // 根据页面名称渲染内容
     switch (pageName) {
         case 'announcements':
-            $contentArea.html(`
+            $contentContainer.html(`
                 <div class="theater-page-header">
                     <h2>通告列表</h2>
-                    <button class="theater-refresh-btn" data-page="announcements"><<i class="fas fa-sync-alt"></</i></button>
+                    <button class="theater-refresh-btn" data-page="announcements"><<<i class="fas fa-sync-alt"></</</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('announcements')}</div>
+                <div class="theater-list-wrap">${getTheaterListHtml('announcements')}</div>
             `);
             break;
         case 'customizations':
-            $contentArea.html(`
+            $contentContainer.html(`
                 <div class="theater-page-header">
                     <h2>粉丝定制</h2>
-                    <button class="theater-refresh-btn" data-page="customizations"><<i class="fas fa-sync-alt"></</i></button>
+                    <button class="theater-refresh-btn" data-page="customizations"><<<i class="fas fa-sync-alt"></</</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('customizations')}</div>
+                <div class="theater-list-wrap">${getTheaterListHtml('customizations')}</div>
             `);
             break;
         case 'theater':
-            $contentArea.html(`
+            $contentContainer.html(`
                 <div class="theater-page-header">
                     <h2>剧场列表</h2>
-                    <button class="theater-refresh-btn" data-page="theater"><<i class="fas fa-sync-alt"></</i></button>
+                    <button class="theater-refresh-btn" data-page="theater"><<<i class="fas fa-sync-alt"></</</i></button>
                 </div>
-                <div class="theater-filters">
-                    <button class="filter-btn active" data-filter="all">全部</button>
-                    <button class="filter-btn" data-filter="hot">🔥 最热</button>
-                    <button class="filter-btn" data-filter="new">🆕 最新</button>
-                    <button class="filter-btn" data-filter="recommended">❤️ 推荐</button>
-                    <button class="filter-btn" data-filter="paid">💸 高价定制</button>
+                <div class="theater-filter-bar">
+                    <button class="theater-filter-btn active" data-filter="all">全部</button>
+                    <button class="theater-filter-btn" data-filter="hot">🔥 最热</button>
+                    <button class="theater-filter-btn" data-filter="new">🆕 最新</button>
+                    <button class="theater-filter-btn" data-filter="recommended">❤️ 推荐</button>
+                    <button class="theater-filter-btn" data-filter="paid">💸 高价</button>
                 </div>
-                <div class="list-container">${_getListHtml('theater')}</div>
+                <div class="theater-list-wrap">${getTheaterListHtml('theater')}</div>
             `);
-            // 绑定筛选器事件
-            jQuery_API(parentWin.document.body).find('.filter-btn').on('click', function() {
-                const $btn = jQuery_API(this);
-                $btn.siblings().removeClass('active');
-                $btn.addClass('active');
-                // 此处可添加筛选逻辑
-            });
             break;
         case 'shop':
-            $contentArea.html(`
+            $contentContainer.html(`
                 <div class="theater-page-header">
                     <h2>欲色商城</h2>
-                    <button class="theater-refresh-btn" data-page="shop"><<i class="fas fa-sync-alt"></</i></button>
+                    <button class="theater-refresh-btn" data-page="shop"><<<i class="fas fa-sync-alt"></</</i></button>
                 </div>
-                <div class="list-container">${_getListHtml('shop')}</div>
+                <div class="theater-list-wrap">${getTheaterListHtml('shop')}</div>
             `);
             break;
         default:
-            $contentArea.html('<p class="empty-list">页面不存在</p>');
+            $contentContainer.html('<p class="theater-empty-tip">页面不存在</p>');
     }
 }
 
-// 获取列表HTML
-function _getListHtml(type) {
-    const data = PhoneSim_State.theaterData?.[type] || [];
-    if (data.length === 0) {
-        return '<p class="empty-list">暂无内容</p>';
+/**
+ * 获取列表HTML
+ * @param {string} type - 列表类型
+ * @returns {string} 列表HTML字符串
+ */
+function getTheaterListHtml(type) {
+    const listData = PhoneSim_State.theaterData?.[type] || [];
+    if (listData.length === 0) {
+        return '<p class="theater-empty-tip">暂无相关内容</p>';
     }
-    return data.map(item => _createListItem(item, type)).join('');
+    return listData.map(item => createTheaterListItem(item, type)).join('');
 }
 
-// 更新导航激活状态
-export function updateNav(activePage) {
-    const $navButtons = jQuery_API(parentWin.document.body).find('#theaterapp-view .nav-btn');
-    if ($navButtons.length === 0) return;
-    $navButtons.removeClass('active');
-    $navButtons.filter(`[data-page="${activePage}"]`).addClass('active');
-}
-
-// 创建列表项
-function _createListItem(item, type) {
+/**
+ * 创建列表项HTML
+ * @param {Object} item - 列表项数据
+ * @param {string} type - 列表类型
+ * @returns {string} 列表项HTML
+ */
+function createTheaterListItem(item, type) {
     let metaHtml = '';
-    let actionsHtml = '';
-    let dataAttributes = '';
+    let actionHtml = '';
+    let dataAttrs = '';
 
-    // 生成data属性
+    // 生成data属性（转义特殊字符）
     for (const key in item) {
         if (item.hasOwnProperty(key)) {
-            const value = typeof item[key] === 'object' 
-                ? JSON.stringify(item[key]).replace(/"/g, '&quot;') 
-                : String(item[key]).replace(/"/g, '&quot;');
-            dataAttributes += `data-${key.toLowerCase()}="${value}" `;
+            const safeValue = String(typeof item[key] === 'object' 
+                ? JSON.stringify(item[key]) 
+                : item[key]).replace(/"/g, '&quot;');
+            dataAttrs += `data-${key.toLowerCase()}="${safeValue}" `;
         }
     }
 
@@ -258,135 +283,112 @@ function _createListItem(item, type) {
     switch (type) {
         case 'announcements':
             metaHtml = `
-                <span class="item-tag">${item.type || '通告'}</span>
-                <span>合作演员: ${item.actor || '未知'}</span>
-                <span class="item-price">${item.payment || '未知'}</span>
+                <span class="theater-item-tag">${item.type || '通告'}</span>
+                <span>演员: ${item.actor || '未知'}</span>
+                <span class="theater-item-price">${item.payment || '未知'}</span>
             `;
             break;
         case 'customizations':
             metaHtml = `
-                <span class="item-tag">${item.typename || item.typeName || '定制'}</span>
-                <span>粉丝: ${item.fanid || item.fanId || '匿名'}</span>
-                <span class="item-price">酬劳: ${item.payment || '0'}</span>
+                <span class="theater-item-tag">${item.typename || '定制'}</span>
+                <span>粉丝: ${item.fanid || '匿名'}</span>
+                <span class="theater-item-price">酬劳: ${item.payment || '0'}</span>
             `;
-            actionsHtml = `
-                <div class="item-actions">
-                    <button class="action-button reject-btn">忽略</button>
-                    <button class="action-button accept-btn">接取</button>
+            actionHtml = `
+                <div class="theater-item-action">
+                    <button class="theater-action-btn reject">忽略</button>
+                    <button class="theater-action-btn accept">接取</button>
                 </div>
             `;
             break;
         case 'theater':
             metaHtml = `
-                <span class="item-tag">${item.tags || '无'}</span>
+                <span class="theater-item-tag">${item.tags || '无'}</span>
                 <span>热度: ${item.popularity || '0'}</span>
-                <span class="item-price">${item.price || '免费'}</span>
+                <span class="theater-item-price">${item.price || '免费'}</span>
             `;
             break;
         case 'shop':
             metaHtml = `
-                <span class="item-tag">商品</span>
-                <span class="item-price">价格: ${item.price || '0'}</span>
+                <span class="theater-item-tag">商品</span>
+                <span class="theater-item-price">价格: ${item.price || '0'}</span>
                 <span>最高价: ${item.highestbid || '0'}</span>
             `;
             break;
     }
 
     return `
-        <div class="list-item" data-type="${type}" ${dataAttributes.trim()}>
-            <div class="item-title">${item.title || item.name || '无标题'}</div>
-            <div class="item-meta">${metaHtml}</div>
-            ${actionsHtml}
+        <div class="theater-list-item" data-type="${type}" ${dataAttrs.trim()}>
+            <div class="theater-item-title">${item.title || item.name || '无标题'}</div>
+            <div class="theater-item-meta">${metaHtml}</div>
+            ${actionHtml}
         </div>
     `;
 }
 
--m 显示详情模态框
-export function showDetailModal(type, itemData) {
-    const $panel = jQuery_API(parentWin.document.body).find(`#${PhoneSim_Config.PANEL_ID}`);
-    if ($panel.length === 0) return;
+/**
+ * 更新导航激活状态
+ * @param {string} activePage - 当前激活页面
+ */
+function updateTheaterNav(activePage) {
+    const $navBtns = $(parentWindow.document.querySelectorAll('.theater-nav-btn'));
+    $navBtns.removeClass('active');
+    $navBtns.filter(`[data-page="${activePage}"]`).addClass('active');
+}
 
-    // 创建模态框（只创建一次）
-    let $modal = $panel.find('#theater-modal');
+/**
+ * 显示详情模态框
+ * @param {string} type - 详情类型
+ * @param {Object} itemData - 详情数据
+ */
+function showTheaterDetail(type, itemData) {
+    const $panelContainer = $(parentWindow.document.getElementById(PhoneSim_Config.PANEL_ID));
+    if ($panelContainer.length === 0) return;
+
+    // 创建模态框（仅一次）
+    let $modal = $panelContainer.find('#theater-detail-modal');
     if ($modal.length === 0) {
-        $modal = jQuery_API(`
-            <div id="theater-modal" class="theater-modal-overlay">
-                <div class="theater-modal-content">
+        $modal = $(`
+            <div id="theater-detail-modal" class="theater-modal-overlay">
+                <div class="theater-modal-box">
                     <div class="theater-modal-header"></div>
                     <div class="theater-modal-body"></div>
                     <div class="theater-modal-footer"></div>
                 </div>
             </div>
         `);
-        $panel.append($modal);
+        $panelContainer.append($modal);
     }
 
+    // 渲染模态框内容
     const $header = $modal.find('.theater-modal-header');
     const $body = $modal.find('.theater-modal-body');
     const $footer = $modal.find('.theater-modal-footer');
     let headerHtml = '', bodyHtml = '', footerHtml = '';
 
-    // 不同类型的详情
     switch (type) {
         case 'announcements':
             headerHtml = itemData.title || '通告详情';
             bodyHtml = `
-                <div class="detail-section">
+                <div class="theater-detail-section">
                     <h4>剧情简介</h4>
                     <p>${itemData.description || '无'}</p>
                 </div>
-                <div class="detail-section">
+                <div class="theater-detail-section">
                     <h4>合作演员</h4>
                     <p>${itemData.actor || '未知'}</p>
                 </div>
-                <div class="detail-section">
+                <div class="theater-detail-section">
                     <h4>酬劳</h4>
-                    <p class="item-price">${itemData.payment || '未知'}</p>
+                    <p class="theater-item-price">${itemData.payment || '未知'}</p>
                 </div>
             `;
             footerHtml = `
-                <button class="action-button reject-btn modal-close">返回</button>
-                <button class="action-button accept-btn" id="start-shooting-btn">开始拍摄</button>
+                <button class="theater-action-btn reject theater-modal-close">返回</button>
+                <button class="theater-action-btn accept">开始拍摄</button>
             `;
             break;
         case 'customizations':
-            headerHtml = `${itemData.fanid || itemData.fanId || '匿名'} 的定制`;
+            headerHtml = `${itemData.fanid || '匿名'} 的定制`;
             bodyHtml = `
-                <div class="detail-section">
-                    <h4>定制类型</h4>
-                    <p>${itemData.typename || itemData.typeName || '无'}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>内容要求</h4>
-                    <p>${itemData.request || '无'}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>备注</h4>
-                    <p>${itemData.notes || '无'}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>酬劳</h4>
-                    <p class="item-price">${itemData.payment || '0'}</p>
-                </div>
-            `;
-            footerHtml = `
-                <button class="action-button reject-btn modal-close">返回</button>
-                <button class="action-button accept-btn" id="accept-custom-btn">接取</button>
-            `;
-            break;
-        case 'theater':
-            headerHtml = itemData.title || '剧场详情';
-            const commentsHtml = _renderComments(itemData.reviews);
-            bodyHtml = `
-                <div class="cover-image" style="background-image: url('${itemData.cover || ''}');"></div>
-                <div class="detail-section">
-                    <h4>作品简介</h4>
-                    <p>${itemData.description || '无'}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>热度</h4>
-                    <p>${itemData.popularity || '0'}</p>
-                </div>
-                <div class="detail-section">
-                    <h4>粉丝热评</h4>
-                    <div>${commentsHtml}
+                <div class="theater
