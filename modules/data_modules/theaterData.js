@@ -1,6 +1,6 @@
-import { PhoneSim_Config } from '../../config.js';
-import { PhoneSim_State } from '../state.js';
-import { PhoneSim_Parser } from './parser.js';
+import { PhoneSim_Config } from '../../config.js'; 
+import { PhoneSim_State } from '../../state.js';   
+import { PhoneSim_Parser } from '../../parser.js'; 
 
 let UI, DataHandler;
 
@@ -352,16 +352,14 @@ const DEFAULT_THEATER_DATA = {
 </div>`,
 };
 
-
 export async function fetchAllTheaterData() {
     try {
         const theaterDb = await DataHandler._fetchFromWorldbook(PhoneSim_Config.WORLD_THEATER_DATABASE);
         if (theaterDb && Object.keys(theaterDb).length > 0 && theaterDb.announcements) {
-            // 数据库数据已解析过，直接赋值
             PhoneSim_State.yuseTheaterData = theaterDb;
             PhoneSim_State.theaterData = theaterDb;
         } else {
-            // 解析DEFAULT_THEATER_DATA的HTML字符串为对象数组
+            // 用正确路径引入的PhoneSim_Parser解析样板数据
             const parsedData = {
                 announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
                 customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
@@ -373,12 +371,11 @@ export async function fetchAllTheaterData() {
                 shop: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.shop)
             };
             PhoneSim_State.yuseTheaterData = DEFAULT_THEATER_DATA;
-            // 赋值给全局状态，供render使用
             PhoneSim_State.theaterData = parsedData;
         }
     } catch (e) {
-        console.error('[Phone Sim] Error fetching Yuse Theater data. Falling back to default data.', e);
-        // 出错时也解析样板数据
+        console.error('[Phone Sim] Error fetching Yuse Theater data.', e);
+        // 出错时的解析逻辑保持原样
         const parsedData = {
             announcements: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.announcements),
             customizations: PhoneSim_Parser.parseListItems(DEFAULT_THEATER_DATA.customizations),
